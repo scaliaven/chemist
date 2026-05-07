@@ -1,74 +1,116 @@
 # asechemist
 
-Development workspace for the **`ase-simulation` Agent Skill** — a Claude Code
-skill that orchestrates atomistic simulations (MD, geometry optimization,
-vibrational analysis, NEB, structure building) on top of ASE, tblite-xTB,
-EMT, TIP3P, **MACE foundation models** (v1.2+), and **Amber GAFF2**
-small-molecule MD (v1.3+).
+> A development workspace for an Agent Skill that takes computational
+> chemistry seriously: documented method selection over feature-list
+> mentality, honest limits over silent fallbacks, mandatory cross-
+> validation over *"just trust the ML potential."*
 
-This repo is **not** an application. There is no library to import and no
-service to run. Working here means editing the skill, regenerating test
-fixtures, and re-running the trigger-test harness to check that changes
-don't regress activation or method-selection behavior. v2 sequencing for
-ML / Amber / Gaussian work is tracked in [`PLAN.md`](PLAN.md).
+`asechemist` is the dev workspace for [`ase-simulation`](ase-simulation/),
+a Claude Code skill for atomistic / molecular simulation. The skill
+bundles seven backends (ASE built-ins, tblite-xTB, MACE foundation
+models, Amber-GAFF2, Gaussian DFT) behind one method-selection router,
+and ships a 17-prompt regression suite that runs trigger / no-trigger
+prompts through `claude -p` to catch activation and method-selection
+drift between releases.
+
+This is **not** an application — there's no library to import and no
+service to run. Working here means editing the skill, regenerating
+test fixtures, syncing the loaded copies, and shipping commits on
+`dev`. v2 sequencing is tracked in [`PLAN.md`](PLAN.md).
+
+---
+
+## Why this project might be worth a read
+
+Computational-chemistry tooling tends toward two failure modes:
+*"here are 50 tools, you figure it out"* (every general-purpose ASE
+script) and *"here's a black box, give me your structure"* (every
+opinionated wrapper). `ase-simulation` lands between them on a
+specific design rigor:
+
+1. **Right method for the system, not for the request.** A *"minimize
+   this molecule"* prompt walks a documented 3-step tree (task →
+   calculator → install check) before doing anything. EMT on an
+   organic gets caught; GFN2-xTB MD on a 5000-atom system gets
+   redirected to MACE; Gaussian DFT refuses to run without explicit
+   method/basis. Each rule has a stated *why*.
+
+2. **Everything through ASE-or-our-own-code.** Seven backends, one
+   Calculator pattern. Output parsing that ASE doesn't cover lives in
+   a small in-house regex helper (`scripts/_gaussian_log.py`,
+   stdlib-only) — not a third-party parser. The one exception (Amber
+   MD running natively in pmemd) is explicitly flagged in
+   `references/amber_carveout.md` and under review.
+
+3. **Honest about limits.** xTB MD stops at ~1k atoms. MACE-medium
+   tops out around 1–2k atoms on a 40 GB GPU. ASE's `Amber` calculator
+   can't drive production MD. Gaussian's `read_gaussian_out` doesn't
+   parse vibrational frequencies. **None of these are hidden** —
+   they're surfaced in plain language whenever relevant.
+
+4. **Cross-validation is non-negotiable for ML potentials.** Every
+   MACE MD run validates against GFN2-xTB every 1 ps and aborts when
+   force MAE exceeds 100 meV/Å. Opt-out is per-run, not the default.
+
+5. **No DFT method/basis defaults.** Gaussian scripts refuse to
+   silently pick — wrong-physics defaults (B3LYP/6-31G(d) on a
+   transition-metal system) are the same failure mode v1 already
+   guards against elsewhere.
+
+If those principles match how you'd want a simulation tool to
+behave, the codebase is worth a read. If you'd rather something
+that *"just works"* without guardrails, you'll find them in the way.
+
+For the user-facing version of this story (with concrete examples
+and the install path), see
+[`ase-simulation/README.md`](ase-simulation/README.md).
+
+---
 
 ## Layout
 
 ```
 asechemist/
-├── ase-simulation/                  # skill dev source (edit here)
-│   ├── SKILL.md, README.md
-│   ├── scripts/
-│   │   ├── check_env.py             # backends + CUDA + Amber detection, capability summary
-│   │   ├── optimize.py              # BFGS/FIRE/LBFGS; calculators emt/lj/tip3p/xtb/mace
-│   │   ├── run_md.py                # NVE / NVT-Langevin / NVT-Nose-Hoover; auto cross-validation w/ MACE
-│   │   ├── single_point.py          # E + dipole/charges/HOMO-LUMO via tblite
-│   │   ├── analyze_traj.py          # RMSD/RMSF/energy drift/RDF
-│   │   ├── ml_calculator.py         # v1.2 — MACE factory, element-set routing, GPU detect
-│   │   ├── validate_ml_md.py        # v1.2 — post-hoc cross-validation vs GFN2-xTB
-│   │   ├── parameterize_gaff2.py    # v1.3 — antechamber AM1-BCC -> parmchk2 -> tleap
-│   │   └── run_amber.py             # v1.3 — min/heat/density/prod via pmemd.cuda/pmemd/sander
-│   ├── references/
-│   │   ├── ase_core.md              # ASE I/O, build, optimizers, MD integrators, NEB
-│   │   ├── xtb.md                   # tblite, GFN1/GFN2/GFN0/GFN-FF, observables, limits
-│   │   ├── analysis.md              # trajectory analysis recipes
-│   │   ├── ml_potentials.md         # v1.2 — MACE method-selection, cross-validation contract
-│   │   ├── amber.md                 # v1.3 — GAFF2 small-mol pipeline; protein/NA -> v2.3
-│   │   └── gaussian.md              # STUB — v2.4 scope + detection spec
-│   └── evals/evals.json
-├── .claude/skills/ase-simulation/   # project-scoped copy loaded by `claude -p`
-├── ~/.claude/skills/ase-simulation/ # user-scoped copy (kept in parity with project)
-├── PLAN.md                          # v2 phase sequencing (Phase 0 -> 1 -> 2 -> deferred)
+├── ase-simulation/                  # the skill itself (dev source — edit here)
+│   ├── SKILL.md                     # trigger contract + method-selection tree
+│   ├── README.md                    # the skill's user-facing README
+│   ├── scripts/                     # 12 scripts (one per task)
+│   ├── references/                  # 17 small scoped reference files
+│   └── evals/evals.json             # 5 prompts for manual review
+├── .claude/skills/ase-simulation/   # project skill copy (loaded by `claude -p`)
+├── ~/.claude/skills/ase-simulation/ # user skill copy (kept in parity)
+├── PLAN.md                          # v2 vision + phase sequencing
+├── CLAUDE.md                        # design decisions for Claude Code sessions
 ├── generate_test.py                 # fixture generator
-├── run_tests.sh                     # trigger-test harness (14 prompts, v1.0 -> v1.3)
+├── run_tests.sh                     # trigger-test harness (17 prompts, v1.0 → v1.4)
 ├── test-inputs/                     # generated fixtures (gitignored)
 └── results/                         # per-run logs + .status (gitignored)
 ```
 
-> The dev source under `ase-simulation/` and the loaded copies under
-> `.claude/skills/ase-simulation/` and `~/.claude/skills/ase-simulation/`
-> can drift. Tests run against the loaded copies. Sync after edits:
->
-> ```bash
-> rsync -a --delete ase-simulation/ .claude/skills/ase-simulation/
-> rsync -a --delete ase-simulation/ ~/.claude/skills/ase-simulation/
-> diff -rq ase-simulation .claude/skills/ase-simulation     # confirm parity
-> diff -rq ase-simulation ~/.claude/skills/ase-simulation   # both copies
-> ```
->
-> [`PLAN.md`](PLAN.md) §"Sequencing rules" says wait until trigger tests pass
-> against dev before syncing — `run_tests.sh` invokes `claude -p` which loads
-> the loaded copy, so practically the order is "edit dev → sync → test → fix
-> in dev → sync → test" until clean.
-
-## Quickstart
+The dev source under `ase-simulation/` and the loaded copies under
+`.claude/skills/` and `~/.claude/skills/` can drift. Tests run
+against the loaded copies. Sync after every edit:
 
 ```bash
-# 0. (Optional, v1.2+) MACE foundation models. CUDA recommended.
-pip install mace-torch
+rsync -a --delete ase-simulation/ .claude/skills/ase-simulation/
+rsync -a --delete ase-simulation/ ~/.claude/skills/ase-simulation/
+diff -rq ase-simulation .claude/skills/ase-simulation     # confirm parity
+diff -rq ase-simulation ~/.claude/skills/ase-simulation
+```
 
-# 0. (Optional, v1.3+) Amber GAFF2 small-molecule MD pipeline.
-conda install -c conda-forge ambertools
+[`PLAN.md`](PLAN.md) §"Sequencing rules" says wait until trigger
+tests pass against dev before syncing — practically the order is
+*edit dev → sync → test → fix in dev → sync → test* until clean.
+
+---
+
+## Development quickstart
+
+```bash
+# 0. Optional backends — install only what you need
+pip install mace-torch                              # MACE (v1.2+)
+conda install -c conda-forge ambertools             # Amber GAFF2 (v1.3+)
+# Gaussian: license-gated; install per https://gaussian.com/
 
 # 1. Sanity-check the simulation environment
 python ase-simulation/scripts/check_env.py
@@ -76,11 +118,9 @@ python ase-simulation/scripts/check_env.py
 # 2. Regenerate fixtures (caffeine.xyz, cluster.xyz, ar108.xyz, md.traj)
 python generate_test.py
 
-# 3. Run the trigger-test suite (writes results/<id>.{log,status})
+# 3. Run the 17-prompt trigger-test suite
 bash run_tests.sh
-
-# longer per-prompt budget (default 180s; ~42 min total at 14 prompts)
-TIMEOUT_SECS=300 bash run_tests.sh
+TIMEOUT_SECS=300 bash run_tests.sh    # default 180s × 17 ≈ 50 min
 
 # 4. Skim outcomes
 for f in results/*.status; do
@@ -88,51 +128,59 @@ for f in results/*.status; do
 done
 ```
 
-The harness exits non-zero if any prompt timed out or errored. Status values
-are `ok`, `timeout`, or `error:<rc>` (124/137 are GNU `timeout` codes).
+The harness exits non-zero if any prompt timed out or errored.
+Status values are `ok`, `timeout`, or `error:<rc>` (124/137 are GNU
+`timeout` codes).
 
-## What the test harness does
+---
 
-`run_tests.sh` runs **fourteen** prompts in fresh `claude -p` sessions with a
-180 s wall-clock cap each, tagged as one of:
+## How the trigger-test harness works
+
+`run_tests.sh` runs **17 prompts** in fresh `claude -p` sessions with
+a 180 s wall-clock cap each. Each prompt is tagged:
 
 - **`trigger`** — the skill should activate and produce a correct ASE script.
 - **`no_trigger`** — generic prompts that should not invoke the skill.
-- **`borderline`** — definitional questions or graceful-deferral cases where
-  either response is defensible; for human review.
+- **`borderline`** — definitional questions or graceful-deferral cases where either response is defensible; for human review.
 
 Coverage by version:
 
 | Version | Prompts | Tests |
 |---|---|---|
-| v1.0/v1.1 baseline | `p1`–`p5` (trigger), `p6`–`p7` (no_trigger), `p8`–`p9` (borderline) | xTB / EMT / LJ / TIP3P, build, analyze |
-| v1.2 — MACE | `p10_mace_named`, `p11_size_cliff` (trigger) | foundation-model trigger phrases, size-cliff method selection |
-| v1.3 — Amber GAFF2 | `p12_gaff2_named`, `p13_antechamber` (trigger), `p14_protein_md` (borderline) | GAFF2 / antechamber triggers, honest v2.3 deferral on proteins |
+| v1.0 / v1.1 baseline | `p1`–`p5` (trigger), `p6`–`p7` (no_trigger), `p8`–`p9` (borderline) | xTB / EMT / LJ / TIP3P / build / analyze |
+| v1.2 — MACE | `p10_mace_named`, `p11_size_cliff` (trigger) | foundation-model triggers, size-cliff method selection |
+| v1.3 — Amber GAFF2 | `p12_gaff2_named`, `p13_antechamber` (trigger), `p14_protein_md` (borderline) | GAFF2 / antechamber triggers, v2.3 protein deferral |
+| v1.4 — Gaussian DFT | `p15_gaussian_sp`, `p16_gaussian_freq` (trigger), `p17_dft_no_method` (borderline) | DFT triggers, no-defaults policy enforcement |
 
-The 180 s budget is intentionally too short to actually run a simulation.
-The test asks "did Claude write the right code?", not "did the code finish?"
-— every prompt instructs the model not to execute its output. Preserve that
-when editing prompts.
+The 180 s budget is intentionally too short to actually run a
+simulation. The test asks *"did Claude write the right code?"*, not
+*"did the code finish?"* — every prompt instructs the model not to
+execute its output. Preserve that instruction when adding prompts.
 
-`evals/evals.json` is a separate set of five richer prompts with free-form
-expected outputs for **manual** review. v1 has no programmatic assertions;
-adding stable ones is iteration 2's job.
+`evals/evals.json` is a separate set of 5 richer prompts with
+free-form expected outputs for **manual** review. v1 has no
+programmatic assertions; that's [v2.0](PLAN.md)'s job.
 
-## Skill design
+---
 
-- [`ase-simulation/README.md`](ase-simulation/README.md) — install, backends,
-  what's in each version, what's coming in v2.2+.
-- [`ase-simulation/SKILL.md`](ase-simulation/SKILL.md) — the trigger contract
-  (description field), method-selection tree, scripts catalog. Editing the
-  description regresses or improves activation; treat it as load-bearing.
-- [`ase-simulation/references/ml_potentials.md`](ase-simulation/references/ml_potentials.md)
-  — MACE method-selection, the cross-validation contract (1 ps cadence,
-  MAE_F > 100 meV/Å abort), known failure modes.
-- [`ase-simulation/references/amber.md`](ase-simulation/references/amber.md)
-  — GAFF2 small-molecule pipeline, force-field choices, engine selection,
-  troubleshooting.
-- [`PLAN.md`](PLAN.md) — phase sequencing for v2 work and decisions
-  deferred to usage data.
-- [`CLAUDE.md`](CLAUDE.md) — load-bearing design decisions (method
-  selection, why `tblite` is preferred over `xtb-python`, what's
-  intentionally out of v1) and what to preserve when editing.
+## Project documentation
+
+- [`ase-simulation/README.md`](ase-simulation/README.md) — the
+  skill's user-facing README. Backends, examples, design principles,
+  install. **Read this first if you want to understand what the
+  skill does.**
+- [`ase-simulation/SKILL.md`](ase-simulation/SKILL.md) — the trigger
+  contract (description field), method-selection tree, scripts
+  catalog. Editing the description field regresses or improves
+  activation; treat it as load-bearing.
+- [`ase-simulation/references/`](ase-simulation/references/) — 17
+  small scoped reference files (1–4k chars each). The umbrella files
+  (`ml_potentials.md`, `amber.md`, `gaussian.md`) are thin indices
+  that point at sub-files for the specific topic — read only the
+  one that matches your task.
+- [`PLAN.md`](PLAN.md) — phase sequencing for v2 work, the v2 vision
+  proposal, and decisions deferred to usage data.
+- [`CLAUDE.md`](CLAUDE.md) — load-bearing design decisions for
+  Claude Code sessions working in this repo. The skill-copy
+  duplication rules, the load-bearing carve-outs, the
+  what-NOT-to-touch list.

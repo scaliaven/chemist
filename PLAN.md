@@ -235,6 +235,130 @@ Update PLAN.md as each lands or as data arrives.
   templates may land in v2.5+; for now users wrap `gaussian_*.py` in
   their own queue script.
 
+## Vision for v2 (proposal — not yet ratified)
+
+This section is an opinionated forward look, written 2026-05-08
+after v1.4 landed. It supersedes the earlier "v2.2+ → v2.4 → v3+"
+sequencing implied above when the two disagree, but Phase 3 open
+questions stay the same. If the user picks a different shape, edit
+this section and re-anchor the milestones.
+
+### Where v1.x actually landed
+
+**Strong**
+
+- The ASE-as-orchestrator pattern works for SCF codes (Gaussian,
+  tblite) and in-process Python calculators (EMT, LJ, MACE).
+- The MACE cross-validation contract is genuinely load-bearing — it
+  is the difference between "we ship MACE" and "we ship MACE
+  honestly."
+- The Phase A reference split (commit `952c5fd`, 2026-05-08) gave
+  the model granular navigation across the three big chapters.
+
+**Weak**
+
+- The skill ships seven backends (EMT / LJ / TIP3P / xTB / MACE /
+  Gaussian / Amber-GAFF2) but has never run a real end-to-end job.
+  v1.2/v1.3/v1.4 are all "code-correct" — they parse `--help` and
+  have plausible-looking control flow, but no one has actually
+  finished a MACE MD with the validation firing, or a real Gaussian
+  Freq, or a GAFF2 ligand simulation. Every integration is on a
+  trust-me footing.
+- Evals are still 5 v1.0 prompts with no programmatic assertions.
+- SKILL.md is ~22k chars after v1.4 and still grows every release.
+- The Amber carve-out has four open options and no resolution.
+
+### Thesis
+
+**v1.x was about feature breadth. v2 should be about earning what we
+built and learning to compose it.** Not "add more engines."
+
+The user value of "we have N backends" is much smaller than "you can
+use them together with confidence." Three backends in a working
+ladder beat seven that don't compose.
+
+### Milestones
+
+**v2.0 — Architectural cleanup. No new backends.**
+
+- **Resolve the Amber carve-out.** Pick one of the four options
+  (Phase 3 above). Driven by usage data when available; by
+  engineering capacity when not — option (4) if there is appetite to
+  build a proper pmemd ASE Calculator, option (3) if not.
+- **Phase B of the navigation refactor**: slim SKILL.md by moving
+  inline rationale into the v1.4 sub-references. Phase A (the
+  reference split) gave a clean target for this. Net result: SKILL.md
+  ~22k → ~12k chars, sub-references hold the multi-paragraph "Why:"
+  blocks and architecture-note callouts.
+- **End-to-end integration tests on a tight benchmark**: HF/STO-3G
+  H₂O Gaussian SP, 1 ps caffeine xTB MD, MACE optimization with
+  cross-validation actually firing, GAFF2 minimization on a small
+  ligand. Each one comes back as `[OK]` or the version's claim is
+  fixed. This earns v1.x's feature claims through real testing
+  instead of trust-me.
+- **Programmatic assertions** added to `evals/evals.json` (file
+  presence, energy ranges, drift signs). PLAN.md has been calling
+  this iteration-2's job since v1.0; v2.0 ships it.
+
+**v2.1 — Composition primitives.**
+
+- A bundled **method-ladder** script: optimize cheap (xTB), refine
+  expensive (DFT). One CLI, not three glued together.
+- A generic **cross-validation primitive**, separated from MACE-
+  specific code. CHGNet / Orb (v2.2) inherit it for free instead of
+  re-implementing.
+- A **workflow registry** at `scripts/workflows/` for repeatable
+  protocols: binding energy with mixed methods; conformer search
+  → DFT refine; multi-stage MD ladders.
+
+**v2.2 — More ML potentials, riding the v2.1 cross-validation primitive.**
+
+- CHGNet for charge-aware materials (battery cathodes, oxidation
+  states).
+- Orb-v3 with its built-in confidence head for richer OOD signal.
+- Both inherit the generic cross-validation contract; no MACE-style
+  bespoke wiring.
+
+**v2.3 — Biomolecular Amber.**
+
+- ff19SB + OPC for proteins; OL21 for nucleic acids.
+- Full tleap-from-PDB pipeline (pdb4amber, disulfide handling,
+  capping).
+- Architecture inherits whatever v2.0 picked for the carve-out.
+
+**v2.4 — HPC submission.**
+
+- SLURM templates / queue-aware wrappers.
+- Restart logic.
+- Pure UX, no architecture changes. Useful only if v2.0 + v2.1
+  landed first.
+
+**v3+ — Research-y extensions.**
+
+- Gaussian: TS / IRC / NBO+NPA / post-HF (CCSD/MP2/CASSCF) /
+  TDDFT / anharmonic.
+- Free energy (TI / FEP / MBAR), enhanced sampling (REMD /
+  metadynamics / umbrella sampling).
+- VASP / QE / community-code bridges (CP2K, FHI-aims).
+- Each is its own design pass with its own validation suite. None
+  belong in v2.
+
+### Open questions to resolve before v2.0 starts
+
+1. **Is "earn before extend" the right v2 thesis?** The alternative
+   is the original PLAN.md path — keep adding engines (CHGNet →
+   Amber-protein → Gaussian extensions). That ships features faster
+   but compounds the untested-integration debt. Pick before v2.0
+   begins.
+2. **Composition or polishing first?** v2.0 (cleanup + earn what's
+   built) is unsexy but probably highest value. v2.1 (composition)
+   is the more interesting work. They could swap order if "build
+   first, clean up after" is a better fit for the team.
+3. **Is the Amber carve-out worth resolving in v2.0, or live with
+   it indefinitely?** Honestly, it could just stay open as a flagged
+   carve-out. The four options are all defensible; declining to pick
+   is also a valid choice.
+
 ## Sequencing rules
 
 - Don't sync to `.claude/skills/ase-simulation/` until a phase's
