@@ -1,229 +1,44 @@
-# Gaussian Reference (v1.4 — DFT SP / Opt / Freq)
+# Gaussian Reference (v1.4 — DFT SP / Opt / Freq) — index
 
-This file replaces the v2 stub. v1.4 ships:
+v1.4 ships DFT single-point energy + forces + dipole, geometry
+optimization, and frequency / thermochemistry analysis through ASE's
+`ase.calculators.gaussian.Gaussian` calculator. All three scripts run
+**through ASE** in the standard Calculator pattern — the g16/g09
+binary runs as a subprocess managed by ASE's `FileIOCalculator`
+machinery, same orchestration model as MACE, tblite, EMT, etc.
+**No carve-out, no cclib.** The in-house `_gaussian_log.py` is a
+pure-regex helper, not an alternate calculator.
 
-- `scripts/gaussian_sp.py` — DFT single-point energy + forces + dipole
-  via `ase.calculators.gaussian.Gaussian`. Mulliken charges and
-  HOMO/LUMO eigenvalues parsed by an in-house regex helper
-  (`scripts/_gaussian_log.py`).
-- `scripts/gaussian_opt.py` — DFT geometry optimization via
-  `GaussianOptimizer` (delegates to Gaussian's L103 internal optimizer
-  in one g16/g09 invocation, ~10–100× faster than wrapping ASE BFGS
-  around per-step Gaussian SP calls).
-- `scripts/gaussian_freq.py` — DFT frequency + thermochemistry
-  (vib_freqs / ZPE / enthalpy / Gibbs G), parsed by the in-house
-  `_gaussian_log.py` helper. **No cclib dependency.** ASE's
-  `read_gaussian_out` does not parse vibrational frequencies, so the
-  helper fills that gap with ~100 lines of regex against Gaussian's
-  format-stable output. Self-contained; no third-party parser needed.
+This file is an index. Each topic lives in its own scoped file —
+read only the one that matches your task instead of paging through
+the whole chapter.
 
-All three scripts run **through ASE** in the standard Calculator pattern
-(`atoms.calc = Gaussian(...)`, `atoms.get_potential_energy()` /
-`GaussianOptimizer(atoms, calc).run(...)`). The g16/g09 binary runs as
-a subprocess managed by ASE's `FileIOCalculator` machinery — same
-orchestration model as MACE, tblite, EMT, etc. **No carve-out, no
-cclib.** The in-house `_gaussian_log.py` is a pure-regex helper, not
-an alternate calculator.
+## When to read which file
 
-## §1. Method-selection rules
+- [`gaussian_method_selection.md`](gaussian_method_selection.md) —
+  the v1.4 framing (what the three scripts ship and the
+  through-ASE / no-cclib stance) plus the method-selection rules
+  (when to reach for Gaussian vs stay on xTB; DFT functional /
+  thermochem / TM / HOMO-LUMO routing).
+- [`gaussian_no_defaults.md`](gaussian_no_defaults.md) — the
+  no-defaults policy (`--method`, `--basis`, `--charge`,
+  `--multiplicity`, `--mem`, `--nproc` all required), defensible
+  recommendations to suggest, solvation (SMD vs PCM), and resource
+  flags (why no auto-detect under SLURM/cgroups).
+- [`gaussian_g16_vs_g09.md`](gaussian_g16_vs_g09.md) — version
+  detection, override flag, and practical route-line differences
+  between g16 and g09.
+- [`gaussian_log_parser.md`](gaussian_log_parser.md) — the in-house
+  `_gaussian_log.py` helper (vib_freqs / thermochem / Mulliken /
+  HOMO-LUMO), the rationale for not using cclib, and what's
+  intentionally not parsed.
+- [`gaussian_failure_modes.md`](gaussian_failure_modes.md) — v1.4
+  out-of-scope list, known wrong-but-plausible failure modes
+  (multiplicity, solvation mismatch, scratch dir, imaginary
+  frequencies), and concrete troubleshooting fixes.
 
-Apply in order. The first rule that fits is your answer.
-
-1. **The user explicitly named a DFT method** (B3LYP, ωB97X-D, M06-2X,
-   PBE0, ...) or asked for DFT/CCSD/post-HF accuracy → use Gaussian.
-2. **The user wants quantitative thermochemistry** (ZPE, enthalpy,
-   Gibbs free energy at ~few-kcal/mol accuracy) → optimize with
-   `gaussian_opt.py --convergence tight`, then run `gaussian_freq.py`
-   at the same method/basis.
-3. **The system is a transition-metal complex and GFN1/GFN2-xTB
-   underperformed** → use Gaussian with a TM-appropriate functional
-   (PBE0-D3(BJ) or TPSSh-D3 with def2-TZVP).
-4. **The user wants HOMO/LUMO at DFT level** rather than the raw xTB
-   eigenvalue gap → use `gaussian_sp.py`. The in-house `_gaussian_log.py`
-   helper parses MO eigenvalues from the .log and reports eV directly.
-   Add `Pop=Reg` via `--extra-route` if Gaussian truncates the default
-   eigenvalue list.
-5. **Otherwise stay on xTB.** Gaussian jobs cost minutes-to-hours;
-   `single_point.py --calculator xtb` costs seconds. The skill should
-   recommend Gaussian only when DFT is actually needed, not as a
-   default upgrade.
-
-## §2. The no-defaults policy
-
-`gaussian_sp.py`, `gaussian_opt.py`, and `gaussian_freq.py` all
-**require** `--method`, `--basis`, `--charge`, `--multiplicity`, `--mem`,
-and `--nproc`. There are no defaults and the scripts will refuse to
-run without them. This is deliberate — silently picking a default has
-been the wrong-physics failure mode v1 already guards against
-elsewhere (EMT on an organic, wrong multiplicity in xTB).
-
-When the user asks "what should I use?", recommend a defensible choice
-and have them confirm before running:
-
-- **Organic SCF** — `wB97XD / def2tzvp`. Outperforms B3LYP-D3 across
-  GMTKN55 (Mardirossian & Head-Gordon, 2017) and is a strong
-  general-purpose default for closed-shell organics.
-- **Transition-metal chemistry** — `PBE0 EmpiricalDispersion=GD3BJ /
-  def2tzvp` is reliable for ligand binding and reaction energies.
-  TPSSh-D3 is a solid alternative for d-block ligand-dissociation
-  thermochemistry.
-- **Cheap baseline** — `B3LYP EmpiricalDispersion=GD3BJ / 6-31G(d)` if
-  the user is reproducing older literature or computational budget is
-  tight. Be honest that this is a publication minimum, not a state of
-  the art default.
-
-Ask if you don't know what kind of system it is. Don't guess.
-
-## §3. Solvation
-
-`--solvent <name>` turns on implicit solvation. Default model is
-**SMD** (`scrf=(SMD,Solvent=...)`). SMD outperforms IEF-PCM by ~3–5
-kcal/mol RMSD on aqueous solvation free energies (SAMPL benchmarks).
-Override with `--solvation-model pcm` only when the user is matching
-older PCM-based literature.
-
-The solvation model and solvent must match across the SP / Opt / Freq
-chain — running Opt in gas phase and Freq in solvent gives garbage
-thermochem. The scripts don't enforce this; document it for the user.
-
-## §4. Resources
-
-`--mem` and `--nproc` are required. The skill does not auto-detect
-because:
-
-- `psutil.virtual_memory().available` reports the **node**, not the
-  job allocation. On HPC under SLURM/cgroups it's wildly wrong.
-- `os.cpu_count()` reports the node, with the same problem.
-- Shared-queue nodes have other users; allocating "everything" is
-  antisocial.
-
-Pass `--mem 8GB --nproc 8` (or whatever your allocation says) and
-let Gaussian's `%mem` / `%nprocshared` do their job. Gaussian itself
-will refuse if `%mem` is bigger than `--mem` requested at job-submit
-time, which is a clean failure mode.
-
-## §5. g16 vs g09
-
-v1.4 detects both at script start:
-
-- `g16` on PATH → preferred (current generation).
-- `g09` on PATH → used as fallback (still common at older sites).
-- Neither → script aborts with an install pointer.
-
-Override with `--gaussian-binary {g16,g09}`. Practical differences:
-
-- **g16 default `SCF=Tight`** — single-points are tight by default;
-  most g09 tutorials' explicit `SCF=Tight` is now redundant. Don't
-  auto-add it on g16.
-- **Some functionals renamed** between versions; if the user copies a
-  g09 route line into a g16-driven script (or vice versa), Gaussian
-  errors out with a clear "unknown method" message rather than
-  silently miscomputing.
-- The in-house `_gaussian_log.py` parser handles both g16 and g09
-  output for the v1.4 fields (vib_freqs, thermochem, Mulliken charges,
-  MO eigenvalues). The format is stable across versions; if a future
-  Gaussian release breaks parsing, the helper file is small enough to
-  patch in place.
-
-## §6. Output parsing — the in-house helper
-
-`gaussian_sp.py` and `gaussian_opt.py` use ASE alone for E/F/dipole
-(`ase.io.gaussian.read_gaussian_out` is fine for those). For the
-fields ASE doesn't parse, v1.4 ships a small in-house helper:
-
-- `scripts/_gaussian_log.py` — ~100 lines of regex against Gaussian's
-  stable .log format. Three public functions:
-
-  - `parse_thermochem(log_path)` — vibrational frequencies (cm⁻¹,
-    signed; negative values are imaginary modes), ZPE, enthalpy,
-    Gibbs free energy, thermochem temperature. Returns a dict;
-    keys absent if the corresponding line wasn't in the log.
-  - `parse_mulliken_charges(log_path)` — list of per-atom Mulliken
-    charges from the most recent `Mulliken charges:` block (Gaussian
-    prints these by default), or None if not found.
-  - `parse_homo_lumo(log_path)` — `(HOMO_eV, LUMO_eV)` from the
-    `Alpha occ./virt. eigenvalues` lines, or None. Gaussian
-    truncates default eigenvalue output for some methods; pass
-    `Pop=Reg` via `--extra-route` to force the full list.
-
-Why in-house instead of cclib:
-
-- **Architectural coherence.** The skill maintains an "everything
-  through ASE-or-our-own-code" framing. cclib is a third-party
-  output parser that wraps the same engines ASE already does;
-  layering it on top adds another vendor surface to track.
-- **Smaller install footprint.** `pip install cclib` pulls in
-  numpy + scipy + a wide compatibility matrix. The in-house helper
-  is stdlib-only (regex + pathlib).
-- **Maintenance burden is small.** Gaussian's Freq output format has
-  been stable across 09 → 16; the parser file is short enough to
-  patch in place if a future release breaks it.
-
-What's intentionally **not** parsed:
-
-- **NPA charges.** Require Gaussian's `Pop=NPA` (which calls NBO);
-  NBO has a different output format that's not worth a parser for
-  v1.4. Recommend running NBO manually if a user asks. v3 candidate.
-- **Löwdin / Hirshfeld charges.** Same reasoning — Mulliken is
-  default Gaussian output; the others require explicit `Pop=`
-  flags and have less consistent output blocks. Add only if usage
-  data demands them.
-- **Higher-derivative properties** (polarizabilities, hyperpolar-
-  izabilities, IR/Raman intensities). Out of scope for v1.4.
-
-## §7. Out of scope (v1.4)
-
-These are not in v1.4 and are intentionally not blocking issues:
-
-- **Transition-state searches** (`Opt=TS`, QST2/QST3) and **IRC**
-  (`IRC=...`). TS needs a good Hessian guess (`CalcFC`/`ReadFC`) and
-  IRC verification — neither fits the "skill writes a script, user
-  runs it" pattern. Push to v3+.
-- **Anharmonic frequencies** (`Freq=Anharmonic`). Expensive and needs
-  careful normal-mode follow-up.
-- **NBO analysis** (`Pop=NBO`) and **NPA charges**. NBO output has
-  a different format that's not worth a parser for v1.4; v3
-  candidate.
-- **Post-Hartree-Fock correlated methods** (CCSD, CCSD(T), MP2,
-  CASSCF). Method-specific basis-set / memory / disk heuristics.
-- **Excited-state methods** (TDDFT, CIS, EOM-CCSD).
-- **Resource autodetection** — see §4.
-- **Local-vs-queue submission** — v1.4 runs locally only. SLURM
-  templates may land in v2.5+; for now the user wraps the script in
-  their own queue script.
-
-## §8. Known failure modes
-
-- **Wrong multiplicity → silently converged-but-wrong wavefunction**
-  for some open-shell systems. If energies look weird, double-check
-  `--multiplicity`.
-- **Solvation mismatch across chain** — SP gas phase, Opt solvated,
-  Freq gas phase produces garbage thermochem. The scripts don't
-  enforce consistency; surface this to the user.
-- **GAUSS_SCRDIR unset** — Gaussian writes scratch to its default
-  location, often `/tmp` or `/scratch` with small quotas. `check_env.py`
-  flags this; tell users to set it before non-trivial runs.
-- **Imaginary frequencies in `gaussian_freq.py`** — typically the
-  preceding optimization wasn't tight enough. Re-optimize at
-  `--convergence tight` or `verytight` and re-run.
-- **g16 vs g09 route differences** — see §5. If a route line copied
-  from older docs fails on g16, try removing redundant
-  `SCF=Tight` first.
-
-## §9. Troubleshooting
-
-- **"Unknown keyword" / "Syntax error in route"** — usually a typo or
-  a g09-specific keyword on g16 (or vice versa). Check the .com file
-  written by ASE under `<label>.com`; route line is on the line
-  starting with `#P`.
-- **Job runs but the parser returns empty / None** — usually means
-  Gaussian errored partway. Look at `<label>.log` for `Error
-  termination`. The in-house parser fails silently rather than
-  raising, so you have to inspect the log directly.
-- **Out of disk** — Gaussian scratch fills up. Set `GAUSS_SCRDIR` to
-  a fast, large-quota path before the run.
-- **`%mem` insufficient** — Gaussian writes "Out-of-memory error in
-  routine ..." to the .log. Re-run with a bigger `--mem`.
-- **SCF doesn't converge** — try `SCF=(MaxCycle=200,XQC)` via
-  `--extra-route`. If it still fails, the geometry is probably
-  pathological.
+The five files together replace the v1.4 monolithic `gaussian.md`
+chapter. SKILL.md, scripts/gaussian_*.py, PLAN.md, CLAUDE.md, and
+README.md may still cite `references/gaussian.md §1` etc. — this
+index keeps those pointers valid by directing the model to the
+right sub-file.

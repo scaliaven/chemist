@@ -1,279 +1,45 @@
-# Amber Reference (v1.3 — GAFF2 small-molecule MD)
+# Amber Reference (v1.3 — GAFF2 small-molecule MD) — index
 
-> **⚠️ Architectural carve-out.** Amber is **the only engine in
-> `ase-simulation` that does not run through ASE.** Every other backend
-> in the skill (EMT, LJ, TIP3P, tblite/xTB, MACE) is wrapped as an ASE
-> `Calculator` and driven by ASE optimizers / MD integrators in-process.
-> Amber bypasses all of that: `parameterize_gaff2.py` and `run_amber.py`
-> shell out to AmberTools binaries (`antechamber`, `parmchk2`, `tleap`)
-> and Amber MD engines (`pmemd.cuda` / `pmemd` / `sander`) via
-> `subprocess.run`. The MD integration loop runs **natively in pmemd**;
-> ASE only sees the input structure on the way in and the NetCDF `.nc`
-> trajectory on the way out (handed to `analyze_traj.py` for analysis).
->
-> **The carve-out was a performance choice, not forced.** `ase.
-> calculators.amber` actually ships **two** classes:
->
-> 1. `Amber` (FileIOCalculator) — shells out to `sander -O` once per
->    `calculate()` call. Single E/F per subprocess. **This** is what's
->    unusable as an MD integrator: ASE's `Langevin` would re-launch
->    sander every fs, and subprocess startup × N steps dwarfs the
->    physics. This class also rejects non-orthogonal cells (the box-
->    truncated-octahedron problem). Use it for one-off SP only.
-> 2. `SANDER` (Calculator) — uses the **`pysander` Python bindings**
->    in-process. `sander.setup(...)` once at construction, then
->    `sander.energy_forces()` per `calculate()` call — pure Python
->    function calls into a C extension, no subprocess per step. ASE's
->    `Langevin` / `VelocityVerlet` would drive this cleanly. The box
->    is taken from `crd.box` directly, so the orthogonal-cell
->    restriction does **not** apply.
->
-> The `SANDER` path is a viable in-process Amber-via-ASE option. v1.3
-> declined it for three concrete reasons:
->
-> - **Engine.** `pysander` binds to **sander** (the reference engine),
->   not pmemd. On a typical 5k-atom system, sander runs at ~1–10 ns/day
->   (CPU); pmemd.cuda runs at ~100–300 ns/day on an A100. The whole
->   "min → heat → density → 500 ps prod" protocol is hours via SANDER
->   vs. minutes via pmemd.cuda.
-> - **No GPU.** `pysander` has no GPU bindings; `pmemd.cuda` cannot be
->   driven from Python this way.
-> - **Maturity.** ASE's docs carry a "tested only for amber16"
->   disclaimer for the Amber module; pmemd direct shell-out has no
->   such caveat and is the production-tested path.
->
-> The trade is real either way. The shell-out path costs architectural
-> coherence; the SANDER path costs production throughput. v1.3 picked
-> speed; that decision is **not** load-bearing and is reviewable.
->
-> **The v1.3 Amber path is under review.** Four open options:
->
-> 1. **Keep pmemd shell-out** (current). Carve-out documented;
->    production-fast.
-> 2. **Switch to `SANDER` + ASE Langevin**. Architecturally clean;
->    accepts CPU-only and ~10–50× slower throughput.
-> 3. **Remove Amber entirely** and tell users honestly that the skill
->    doesn't ship a classical MM backend.
-> 4. **Build the missing API path** — write a proper ASE Calculator
->    that wraps `pmemd` / `pmemd.cuda` directly. Two sub-shapes are
->    plausible: (a) a long-lived `pmemd` subprocess where ASE owns
->    setup/teardown but pmemd owns the integration loop (preserves
->    pmemd.cuda speed and brings the wrapper into ASE-Calculator
->    shape at the script level, even if per-step E/F isn't exposed);
->    (b) contribute `pmemd`/`pmemd.cuda` Python bindings upstream so
->    a future `PMEMD` class in `ase.calculators.amber` can bind them
->    the way `SANDER` binds pysander. Most work of the four options;
->    only one with both ASE-coherence and pmemd.cuda throughput.
->
-> See [`PLAN.md`](../../PLAN.md) §"Phase 3" for the decision criterion
-> (usage frequency × GPU prevalence × engineering capacity).
+v1.3 ships **GAFF2 + AM1-BCC** small-molecule explicit-solvent MD via
+two scripts (`scripts/parameterize_gaff2.py`, `scripts/run_amber.py`)
+that shell out to AmberTools (`antechamber`, `parmchk2`, `tleap`) and
+Amber MD engines (`pmemd.cuda` > `pmemd` > `sander`). Amber is the
+**only engine in `ase-simulation` that does not run through ASE** —
+the architectural carve-out and its review options are documented in
+[`amber_carveout.md`](amber_carveout.md). Protein and nucleic-acid MD
+(ff19SB+OPC, OL21) are deferred to **v2.3**.
 
-This file replaces the v2 stub for the **GAFF2 small-molecule path**.
-v1.3 ships:
+This file is an index. Each topic lives in its own scoped file —
+read only the one that matches your task instead of paging through
+the whole chapter.
 
-- `scripts/parameterize_gaff2.py` — antechamber AM1-BCC charges →
-  parmchk2 frcmod → tleap solvation in TIP3P / OPC → `.prmtop` /
-  `.rst7`.
-- `scripts/run_amber.py` — Jinja-style mdin templates for
-  `min` / `heat` / `density` / `prod`, engine selection
-  (`pmemd.cuda` > `pmemd` > `sander`), NetCDF `.nc` output handed to
-  `analyze_traj.py`.
+## When to read which file
 
-**Protein and nucleic-acid MD** (ff19SB+OPC, OL21) are deferred to
-**v2.3** — the prep pipeline (pdb4amber, multi-residue tleap recipes,
-disulfide handling, capping) is its own design problem and the v1.3
-scripts deliberately do not adapt for it.
+- [`amber_carveout.md`](amber_carveout.md) — the architectural
+  carve-out warning: why Amber bypasses ASE, the `Amber` vs `SANDER`
+  ASE classes, and the four open options for the v1.3 path under
+  review. Read this when GAFF2 is recommended or when questioning
+  why Amber doesn't go through ASE like every other backend.
+- [`amber_method_selection.md`](amber_method_selection.md) — the
+  5-rule walk for when to reach for GAFF2 vs GFN2-xTB vs "not yet
+  supported"; v1.3-ships framing and the protein/NA-deferred-to-v2.3
+  note. Cited as "references/amber.md §1" by scripts and SKILL.md.
+- [`amber_pipeline.md`](amber_pipeline.md) — the two-script bash
+  pipeline (`parameterize_gaff2.py` → `run_amber.py` →
+  `analyze_traj.py`) plus idempotency notes.
+- [`amber_force_fields.md`](amber_force_fields.md) — force-field
+  choices (GAFF2, GAFF, RESP), water models (TIP3P, OPC, others),
+  charge assignment (AM1-BCC, RESP, the mandatory `--net-charge`
+  flag), and engine selection (`pmemd.cuda` > `pmemd` > `sander`).
+- [`amber_failure_modes.md`](amber_failure_modes.md) — known
+  failure modes (antechamber aromatic perception, wrong
+  `--net-charge`, box-too-small, octahedron not used, CPU-only
+  engine mismatch, `pmemd.cuda` OOM); troubleshooting recipes; and
+  the v1.3 out-of-scope list (proteins, free energy, REMD, QM/MM,
+  umbrella sampling, constant-pH, anisotropic barostat, SLURM).
 
-## §1. Method-selection rules
-
-Apply in order. The first rule that fits is your answer.
-
-1. **System is a single small organic molecule (≤ ~150 atoms) and the
-   user wants explicit-solvent MD** → GAFF2 + AM1-BCC, run via the
-   v1.3 scripts. Why: classical force fields scale; GFN2-xTB does not
-   past ~1k atoms (and explicit solvation pushes any drug-sized solute
-   well past that with a 12 Å buffer).
-2. **System is a small organic molecule and the user wants a quick
-   energy / single-point / vacuum optimization** → GFN2-xTB. Why: no
-   parameterization step, no charge-and-multiplicity-and-solvent
-   ceremony. Use `scripts/single_point.py --calculator xtb` or
-   `scripts/optimize.py --calculator xtb`.
-3. **System is a small organic in implicit solvent or vacuum that the
-   user wants to thermalize** → GFN2-xTB MD via `scripts/run_md.py`.
-   Why: for short runs (≤ 50 ps) on small molecules, xTB is honest and
-   doesn't need parameterization.
-4. **System is a protein, nucleic acid, peptide, lipid, or any
-   biopolymer** → not yet supported. v2.3 will add ff19SB+OPC and
-   OL21 paths. Today: tell the user honestly that v1.3 is GAFF2 only;
-   they can run their existing tleap workflow outside the skill and
-   feed the resulting `.prmtop` / `.rst7` to `run_amber.py` with
-   `--engine pmemd` (the script does not check what force field is
-   in the prmtop). Caveat them that v1.3's `mdin` defaults are tuned
-   for GAFF2 small molecules — protein production runs may want
-   different `cut`, `gamma_ln`, restraints, etc.
-5. **System needs free energy, REMD, QM/MM, umbrella sampling,
-   constant-pH, or any enhanced-sampling protocol** → not in scope
-   for v1.3 or v2.x. These are research workflows with their own
-   design pass. Tell the user honestly.
-
-## §2. Pipeline
-
-The two-script pipeline is:
-
-```bash
-# Step 1: parameterize. Output: <prefix>.prmtop, <prefix>.rst7.
-python scripts/parameterize_gaff2.py \
-    --structure ligand.pdb \
-    --net-charge 0 \
-    --water tip3p \
-    --buffer 12.0 \
-    --output-prefix ligand --output-dir run/
-
-# Step 2: run MD. Output: run/min.{nc,rst7,mdout}, run/heat.{...},
-# run/density.{...}, run/prod.{...}.
-python scripts/run_amber.py \
-    --prmtop run/ligand.prmtop --rst run/ligand.rst7 \
-    --protocol standard --output-dir run/
-
-# Step 3: analyze the production trajectory.
-python scripts/analyze_traj.py --trajectory run/prod.nc \
-    --topology run/ligand.prmtop ...
-```
-
-`parameterize_gaff2.py` is idempotent — re-running it overwrites the
-`.prmtop`/`.rst7` and intermediates. `run_amber.py` is **not**
-idempotent: re-running with the same `--output-dir` overwrites the
-`mdout` files but does not delete old `.nc` trajectories from
-previous runs. Use a fresh `--output-dir` per run.
-
-## §3. Force fields and water models
-
-### Force fields
-
-- **GAFF2** is the default and the only thing v1.3 supports for small
-  molecules. It's the post-2020 successor to GAFF, calibrated on a
-  larger ZINC-derived dataset, with revised dihedral parameters that
-  produce more reliable conformer ensembles.
-- **GAFF (the original)** stays usable if the user is reproducing
-  literature that explicitly used it. Pass `-at gaff` to antechamber
-  manually; v1.3's `parameterize_gaff2.py` does not expose the flag
-  (intentional — not the documented default in 2026).
-- **GAFF2 + RESP** is more accurate for charged species but needs an
-  explicit Gaussian or psi4 single-point. Out of scope for v1.3;
-  AM1-BCC is good enough for ~98% of the GAFF2 calibration set.
-
-### Water models
-
-- **TIP3P** is GAFF2's calibration target — pair them. This is the
-  v1.3 default.
-- **OPC** is a more accurate 4-site water model; pairs naturally with
-  ff19SB (proteins) but is fine with GAFF2 too. Pass `--water opc` if
-  the user explicitly wants OPC; otherwise stay on TIP3P.
-- **TIP4P-Ew, SPC/E, etc.** — supported by tleap but not exposed by
-  the v1.3 CLI. Edit `tleap.in` by hand if you need one of these and
-  re-run `tleap` directly; the rest of `run_amber.py` will work.
-
-### Charge assignment
-
-- **AM1-BCC via `antechamber -c bcc`** is the v1.3 default. Fast
-  (semi-empirical), well-calibrated for GAFF2.
-- **RESP via Gaussian + RED-Server** is more accurate but multi-step,
-  license-gated (Gaussian), and does not belong in a one-shot CLI.
-  Out of scope for v1.3.
-- **The `--net-charge` flag is mandatory** — antechamber silently
-  uses 0 if you don't pass it, which gives wrong AM1-BCC partial
-  charges for any non-neutral species. Always tell the user to
-  double-check the formal charge of their molecule.
-
-## §4. Engine selection
-
-`run_amber.py` picks engines in this order, taking the first one on
-PATH:
-
-1. **`pmemd.cuda`** — GPU production. AmberTools25 ships it open-
-   source; older Amber required a paid license (no longer relevant).
-   Roughly 50–200× faster than sander for typical small-molecule
-   systems on a single A100.
-2. **`pmemd`** — multi-threaded CPU production. Use when no GPU
-   available; 5–20× faster than sander.
-3. **`sander`** — reference engine. Slow but bulletproof; useful for
-   minimization (where the speed difference is small) and for any
-   diagnostic step where you want the documented reference behaviour.
-
-Override with `--engine sander` (testing) or `--engine pmemd.cuda`
-(force GPU even if pmemd is also present).
-
-If the user has both `pmemd.cuda` and `pmemd` on PATH and is running
-on a CPU-only node, **the auto-selection picks `pmemd.cuda` and the
-job will fail at runtime** with a CUDA initialization error. Use
-`--engine pmemd` explicitly in that case. (v1.3 does not probe the
-host for actual GPU availability before selecting; that's a v2.4
-nice-to-have.)
-
-## §5. Known failure modes
-
-- **antechamber silently fails on aromatic perception.** If the input
-  structure has unusual valence states (e.g., a carbene, a nitrene,
-  any radical), antechamber may produce a `.mol2` with wrong bond
-  orders that `parmchk2` then can't generate parameters for. Symptom:
-  tleap errors with "could not find atom type". Workaround: pre-clean
-  the structure with OpenBabel or Chem3D, or run antechamber
-  manually with `-fi mol2` from a known-good mol2.
-- **Wrong `--net-charge`.** AM1-BCC charges are off by a constant
-  per-atom shift if the net charge is wrong. Symptom: total partial
-  charge in the mol2 doesn't match the formal charge; system slowly
-  blows up during heating. Fix: verify the formal charge from a
-  Lewis structure and re-run.
-- **Box too small.** A 12 Å buffer is the AmberMD tutorial standard
-  but for highly anisotropic molecules (long, flat) the box can end
-  up too small in one dimension. Symptom: production-MD stage
-  reports image-of-image close contact warnings. Fix: re-parameterize
-  with `--buffer 15.0` or larger.
-- **Truncated octahedron not used.** v1.3 uses rectangular boxes
-  (`solvateBox`, not `solvateOct`). For rotationally symmetric
-  systems an octahedron saves ~20–30% of the solvent atoms; we
-  trade that efficiency for predictable downstream behaviour. Edit
-  the tleap deck by hand if you need an octahedron.
-- **Engine mismatch on CPU-only nodes** — see §4 above.
-- **`pmemd.cuda` OOM at large box sizes.** A 40 GB GPU runs out of
-  memory around 100k–200k atoms depending on the model. Symptom:
-  CUDA OOM error in `prod.mdout`. Fix: reduce buffer or split
-  trajectory across multiple shorter runs.
-
-## §6. Troubleshooting
-
-- **"could not find atom type" in tleap.log** — antechamber produced
-  a typed mol2 with an atom type GAFF2 doesn't know. Check the
-  antechamber `--keep-intermediates` output; usually a structure
-  cleanliness issue (radicals, hypervalent atoms, missing hydrogens).
-- **Heat stage produces NaN** — almost always charge parity (wrong
-  `--net-charge`) or unconstrained hydrogens (someone removed
-  `ntc=2, ntf=2` from the mdin). Less commonly, a bad starting
-  structure with overlapping atoms; run minimization longer.
-- **Density stage drifts away from 1 g/cm³** — expected for ~100 ps
-  on small boxes; should converge within ~200 ps. If it doesn't, the
-  buffer is probably too small (§5) or the temperature is too high.
-- **`pmemd.cuda` runs but production trajectory shows energy drift** —
-  check `cut=10.0` in the mdin; some users default to 8 Å which is
-  too tight for charged species and produces drift.
-- **MDAnalysis can't read the .nc file** — install netCDF support
-  (`pip install netCDF4`); ASE's reader is fine but MDAnalysis's
-  default does not include the binary backend on every install.
-
-## §7. Out of scope (v1.3)
-
-These are not in v1.3 and are not blocking issues — they are scope
-decisions:
-
-- **Protein and nucleic-acid MD** with ff19SB+OPC, ff14SB, OL21 —
-  v2.3.
-- **Free-energy methods** (TI / FEP / MBAR / SLEEK).
-- **Enhanced sampling** (REMD, accelerated MD, metadynamics, AWH).
-- **QM/MM** with sander/quick or external QM engines.
-- **Umbrella sampling** and constrained-coordinate schemes.
-- **Constant-pH MD** or any titration protocol.
-- **NPT with anisotropic barostat** — v1.3 uses isotropic Berendsen
-  (`ntp=1, taup=2.0`), which is fine for solution-phase but wrong
-  for crystals or membranes. Edit the mdin manually if needed.
-- **SLURM submission** — v1.3 prints the engine command; the user
-  wraps it in a queue script. v2.4 may add submission templates.
+The five files together replace the v1.3 monolithic `amber.md`
+chapter. SKILL.md, PLAN.md, CLAUDE.md, `scripts/parameterize_gaff2.py`,
+and `scripts/run_amber.py` may still cite `amber.md` (e.g.,
+"references/amber.md §1") — this index keeps those pointers valid by
+directing the model to the right sub-file.
