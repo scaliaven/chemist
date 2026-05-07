@@ -176,21 +176,45 @@ tleap-from-PDB system prep for biomolecules; multi-GPU pmemd.cuda.
 These come from the original §4 stub questions plus subagent flags.
 Update PLAN.md as each lands or as data arrives.
 
-- **Amber path: keep or remove?** v1.3 ships GAFF2 small-molecule MD via
-  shell-out to AmberTools and pmemd. **Amber is the only engine in
-  `ase-simulation` that does not run through ASE** (every other backend
-  is wrapped as an ASE Calculator and driven in-process). The carve-out
-  is forced — `ase.calculators.amber.Amber` is single-point only and
-  rejects non-orthogonal cells, both fatal for MD — but it does break
-  the "everything orchestrated through ASE" framing the rest of the
-  skill maintains, and it doubles the surface area new contributors
-  have to learn (mdin templates, antechamber pipeline, NetCDF I/O,
-  engine-selection edge cases). **Decision criterion:** if usage data
-  shows GAFF2 small-molecule MD is rarely requested (e.g., < ~5% of
-  v1.3 invocations), the right call is to drop the v1.3 Amber path and
-  tell users honestly that the skill doesn't ship a classical MM
-  backend. If usage is heavy, the carve-out warts are worth keeping.
-  Revisit at the same 2-week mark as the other usage-data questions.
+- **Amber path: keep, switch to SANDER+ASE, or remove?** v1.3 ships
+  GAFF2 small-molecule MD via shell-out to AmberTools and pmemd.
+  **Amber is the only engine in `ase-simulation` that does not run
+  through ASE** (every other backend is wrapped as an ASE Calculator
+  and driven in-process). The carve-out was a **performance choice,
+  not forced** — `ase.calculators.amber.SANDER` (pysander Python
+  bindings, in-process, no subprocess per step) would let ASE drive
+  the MD loop coherently. v1.3 declined that path because pysander
+  binds only to CPU sander (no pmemd.cuda); on a typical 5k-atom
+  system, the whole min/heat/density/500-ps-prod protocol is hours
+  via SANDER vs. minutes via pmemd.cuda. The shell-out also doubles
+  the surface area new contributors have to learn (mdin templates,
+  antechamber pipeline, NetCDF I/O, engine-selection edge cases).
+  **Four options:**
+    1. *Keep pmemd shell-out (current).* Production-fast, GPU-accelerated;
+       accept the architectural carve-out.
+    2. *Switch to `SANDER` + ASE Langevin.* Architecturally clean;
+       accept CPU-only and ~10–50× slowdown. Becomes attractive if most
+       users don't actually have a GPU, or if their typical run is short
+       enough that wall-clock difference is acceptable.
+    3. *Remove Amber entirely.* Tell users honestly that the skill
+       doesn't ship a classical MM backend.
+    4. *Build the missing API path.* Write a proper ASE Calculator
+       around `pmemd` / `pmemd.cuda` so the wrapper is ASE-shaped and
+       still hits pmemd.cuda speed. Two sub-shapes: (a) long-lived
+       pmemd subprocess where ASE owns setup/teardown but pmemd owns
+       the integration loop — wraps cleanly at the script level even
+       though per-step E/F isn't exposed; (b) contribute `pmemd` /
+       `pmemd.cuda` Python bindings upstream so a future `PMEMD` class
+       in `ase.calculators.amber` can bind them the way `SANDER` binds
+       pysander. Most engineering work of the four; only option that
+       gets both ASE-coherence and pmemd.cuda throughput.
+  **Decision criterion:** usage frequency × GPU prevalence × typical
+  run length × engineering capacity. If GAFF2 use is rare (< ~5% of
+  v1.3 invocations), pick (3). If it's common but most users are
+  GPU-less or run short trajectories, pick (2). If it's common, users
+  want production-length runs at scale, **and** there's appetite to
+  invest in a wrapper, pick (4). Otherwise (1) holds — the carve-out
+  is the tax for production speed without engineering work.
 - **ML**: molecules-vs-materials audience balance; system-size
   distribution; whether mandatory cross-validation overhead is
   acceptable; GPU prevalence among skill users.

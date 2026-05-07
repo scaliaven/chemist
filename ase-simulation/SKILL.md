@@ -115,14 +115,23 @@ Apply the first rule that fits the system, in this order:
    > and `run_amber.py` shell out to AmberTools and pmemd directly; the
    > MD integration loop runs natively in pmemd, not in ASE. ASE handles
    > structure I/O at the boundaries and post-hoc analysis via
-   > `analyze_traj.py`, but the simulation itself is opaque to ASE. The
-   > carve-out is forced — `ase.calculators.amber.Amber` is single-point
-   > only and rejects non-orthogonal cells, both fatal for production
-   > MD. **This is a known architectural inconsistency and the v1.3
-   > Amber path may be removed** if the wart outweighs its value; see
-   > `PLAN.md` §"Phase 3" for the open question. When recommending
-   > GAFF2 to the user, surface the carve-out honestly so they can
-   > decide whether they want it.
+   > `analyze_traj.py`, but the simulation itself is opaque to ASE.
+   > **The carve-out was a performance choice, not forced.** ASE does
+   > expose an in-process Amber path via `ase.calculators.amber.SANDER`
+   > (pysander Python bindings to sander), which would let
+   > `run_md.py --calculator amber-sander` work cleanly. v1.3 chose
+   > pmemd shell-out anyway because pmemd.cuda is GPU-accelerated and
+   > ~10–50× faster than CPU sander on production-sized systems
+   > (5–50k atoms); the SANDER path is CPU-only (pysander does not
+   > bind to pmemd.cuda) and carries a "tested only for amber16"
+   > disclaimer. **This trade is under review** — four options on the
+   > table: keep pmemd shell-out, switch to SANDER+ASE Langevin,
+   > remove Amber entirely, or build the missing API path (write a
+   > proper ASE Calculator around pmemd/pmemd.cuda so the wrapper is
+   > ASE-shaped and still hits pmemd.cuda speed). See
+   > `references/amber.md` §1 and `PLAN.md` §"Phase 3" for the open
+   > question. When recommending GAFF2 to the user, surface the
+   > carve-out honestly so they can decide whether they want it.
 5. **If the system is a transition-metal complex and GFN2 fails to
    converge**, fall back to **GFN1-xTB**. *Why:* GFN1 is more robust on
    d-block elements at the cost of some accuracy.

@@ -214,13 +214,16 @@ def main() -> int:
 
     print("[amber] CARVE-OUT NOTE: the MD integration loop runs natively in")
     print("[amber]   pmemd / pmemd.cuda / sander, NOT through ASE. Amber is")
-    print("[amber]   the only engine in ase-simulation that bypasses ASE;")
-    print("[amber]   ase.calculators.amber.Amber is single-point only and")
-    print("[amber]   rejects non-orthogonal cells, both fatal for MD. ASE")
-    print("[amber]   handles structure I/O at the boundaries; the simulation")
-    print("[amber]   itself is opaque to ASE. This carve-out is under review")
-    print("[amber]   for removal — see references/amber.md §1 and PLAN.md")
-    print("[amber]   §Phase 3.")
+    print("[amber]   the only engine in ase-simulation that bypasses ASE.")
+    print("[amber]   This is a performance choice, not forced — ASE has an")
+    print("[amber]   in-process Amber Calculator (ase.calculators.amber.SANDER")
+    print("[amber]   via pysander) that would be ASE-coherent, but it is")
+    print("[amber]   CPU-only (no pmemd.cuda binding) and ~10-50x slower than")
+    print("[amber]   the pmemd.cuda path used here. Trade under review with")
+    print("[amber]   four options on the table: keep pmemd shell-out, switch")
+    print("[amber]   to SANDER+ASE, remove Amber entirely, or build a proper")
+    print("[amber]   ASE Calculator around pmemd/pmemd.cuda. See")
+    print("[amber]   references/amber.md §1 and PLAN.md §Phase 3.")
     print()
 
     if args.protocol and args.stage:

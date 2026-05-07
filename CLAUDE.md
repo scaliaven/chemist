@@ -155,12 +155,21 @@ move the eval results, so know what you're changing:
   plausible-but-wrong PESs that users cannot spot. `--no-validate` is a
   per-run choice, never a default. If you change the threshold or
   cadence, document why in `references/ml_potentials.md` first.
-- **Amber uses shell-out, not ASE-Calculator** (v1.3+). `ase.calculators.
-  amber.Amber` is single-point only (re-launches sander per `calculate()`
-  call — fatal for MD) and rejects non-orthogonal cells. v1.3 writes
-  `mdin` decks and shells out to `pmemd` / `pmemd.cuda` / `sander`
-  directly. Do not "improve" this by switching to the ASE calculator
-  path.
+- **Amber uses shell-out, not ASE-Calculator** (v1.3+) — but this is a
+  performance choice, not forced. ASE ships **two** Amber calculators:
+  (1) `ase.calculators.amber.Amber` (FileIOCalculator, subprocess per
+  call — unusable for MD), and (2) `ase.calculators.amber.SANDER`
+  (pysander in-process bindings — works fine for ASE-driven MD via
+  `Langevin`/`VelocityVerlet`). v1.3 declined the SANDER path because
+  pysander binds only to CPU sander (no pmemd.cuda), giving up ~10–50×
+  throughput on production-sized systems. A fourth option exists and
+  is on the table: build a proper ASE Calculator around pmemd /
+  pmemd.cuda (long-lived subprocess wrapper, or contribute pmemd
+  Python bindings upstream) — gets both ASE-coherence and pmemd.cuda
+  speed, at the cost of real engineering work. If you're tempted to
+  "fix" the carve-out by switching to SANDER, read `references/
+  amber.md` §1 first — the trade is documented and the decision is
+  reviewable in `PLAN.md` §Phase 3, not load-bearing.
 - **The SKILL.md `description` field is the trigger contract.** It deliberately
   enumerates user phrases ("relax this molecule", "thermalize at 300 K", "build
   a Pt(111) slab", "use MACE", "GAFF2 in water", "antechamber", etc.).
