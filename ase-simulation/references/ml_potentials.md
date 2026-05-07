@@ -67,21 +67,34 @@ need it.
 When v2 work begins on ML potentials, the chapter that replaces this
 stub will cover:
 
-- **MACE-MP-0** as an ASE Calculator drop-in for both molecules and
-  materials, used for geometry optimization and MD on systems where
-  GFN2-xTB is too slow (~1k–10k atoms).
-- **CHGNet** as an ASE Calculator drop-in for inorganic-materials MD
-  and optimization, with awareness that CHGNet is charge-aware (so
-  battery-cathode / oxidation-state-sensitive use cases get specific
-  callouts).
-- An **explicit cross-validation protocol**: every v2 ML workflow will
-  document how to spot-check the PES against xTB (for organics) or
-  DFT (for materials), e.g., periodic single-points on snapshots and
-  energy/force agreement checks. The protocol is part of the workflow
-  — not optional, not an appendix.
-- Clear **size and accuracy guidance**: when to reach for an ML
-  potential vs. when GFN2-xTB is still the right answer (size cliff
-  ~1k atoms, dynamics duration cliff at ~10 ps of xTB MD).
+- **MACE-MP-0** as an ASE Calculator drop-in for inorganic crystals,
+  bulk materials, and mixed systems (89-element coverage), used for
+  geometry optimization and MD on systems where GFN2-xTB is too slow.
+- **MACE-OFF** (the organics-trained MACE foundation model, 10
+  elements: H/C/N/O/P/S/F/Cl/Br/I) as the parallel drop-in for
+  pure-organic systems where it outperforms GFN2-xTB on torsions and
+  conformers. **Same vendor, single install (`pip install
+  mace-torch`)** — chosen over MACE-MP-0 + CHGNet because the dual-
+  vendor pairing duplicates dependencies and forces awkward
+  "is this organic enough for CHGNet to break?" routing logic.
+  CHGNet is **deferred to v2.2** and lands when battery-cathode /
+  charge-aware materials become a documented usage pattern.
+- An **explicit, mandatory cross-validation contract.** Every v2 MD
+  run with an ML potential validates by default: at every checkpoint
+  interval (default 1 ps), recompute energy and forces on the latest
+  frame through GFN2-xTB (organics) or a user-supplied reference
+  (materials); write `validation.csv` with `step, MAE_E_meV,
+  MAE_F_meV_per_A, max_F_dev_meV_per_A`; abort the run when
+  `MAE_F > 100 meV/Å`. Users who want raw speed can opt out with
+  `--no-validate`, but the default is on. This is non-negotiable —
+  ML potentials produce plausible-looking PESs that are wrong in
+  ways users do not notice, so the skill cannot recommend them
+  honestly without an integrated check.
+- Clear **size and accuracy guidance**: practical ceiling on a 40 GB
+  GPU is **~1–2k atoms** with MACE medium, not the 10k figure earlier
+  drafts of this stub claimed. CPU mode is ~10× slower; the size
+  cliff effectively halves there. Users hitting OOM should drop to
+  the small model or shrink the system, not push through.
 
 It will explicitly **not** cover, in v2:
 
@@ -102,9 +115,13 @@ These are explicitly v3+ (or "not in scope at all") candidates.
 ## §4. Open questions (to be answered by usage data)
 
 1. **Which package is the dominant ask — MACE, CHGNet, Orb, or
-   something else?** v2 should land *one* foundation model as the
-   default and add the others incrementally; usage data should pick
-   which one.
+   something else?** *Answered (2026-05-07): MACE.* The MACE-MP-0 +
+   MACE-OFF pairing is the only foundation-model line with first-class
+   checkpoints for **both** sides of the v1 method tree (materials and
+   organics) under a single install. CHGNet → v2.2 (charge-aware
+   materials), Orb-v3 → v2.2+ (confidence-head OOD signal). Other
+   packages (M3GNet, SevenNet, MatterSim) stay in detection-only
+   `[v2 preview]` until usage data argues for them.
 2. **Molecules or materials — which audience is louder?** MACE-MP-0
    covers both but the workflows diverge (MD vs. structure search,
    PBC vs. no PBC, charges vs. no charges).

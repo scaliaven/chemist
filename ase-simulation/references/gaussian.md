@@ -58,16 +58,29 @@ When v2 work begins on Gaussian, the chapter that replaces this stub
 will cover:
 
 - **Single-point energies** at a user-specified method/basis, with cclib
-  parsing of energies and (when present) dipoles, NPA charges via
-  `Pop=NPA`, and orbital energies.
-- **Geometry optimization** (`Opt`) with sensible default convergence
-  criteria, plus a tight-criteria mode for vibrational input.
+  parsing of energies, (when present) dipoles, Mulliken / Löwdin /
+  Hirshfeld charges, and orbital energies. **NPA charges are out of
+  scope for v2** — cclib's main attribute set does not expose NPA, and
+  the cclib NBO parser is a separate dependency / parser path. NPA
+  support is a v3 candidate.
+- **Geometry optimization** via `GaussianOptimizer` (which delegates to
+  Gaussian's own L103 optimizer — much faster than wrapping ASE
+  optimizers around Gaussian single points), plus a tight-criteria
+  mode for vibrational input.
 - **Frequency analysis** (`Freq`), including thermochemistry parsing
   (ZPE, enthalpy, Gibbs free energy) at the requested temperature.
+  Implementation note: `ase.io.gaussian.read_gaussian_out` does **not**
+  parse vibrational frequencies — the Freq workflow must use cclib for
+  output parsing, not the ASE reader.
 - **Transition-state searches** via `Opt=TS` plus QST2/QST3 starting
-  points; an explicit warning that these need good guesses.
-- **Implicit solvation** via `SCRF=(PCM,Solvent=...)` for the common
-  PCM/SMD use cases.
+  points; an explicit warning that these need good guesses. *(This
+  may move to v3 — TS searches need a good Hessian guess (`CalcFC`/
+  `ReadFC`) and post-hoc IRC verification, neither of which fits the
+  "skill writes a script, user runs it" pattern.)*
+- **Implicit solvation** via `SCRF=(SMD,Solvent=...)` as the default for
+  aqueous and polar-solvent work (SMD beats IEF-PCM by ~3–5 kcal/mol
+  RMSD on solvation free energies). PCM stays available as an opt-in
+  for matching older literature.
 
 It will explicitly **not** cover, in v2:
 
@@ -89,12 +102,16 @@ Those are v3+ candidates.
    always ask" policy is safer but reads as the skill not actually
    helping. The right answer depends on what users are actually
    computing.
-2. **Solvation defaults.** When the user says "in water," does the
-   skill default to `SCRF=(PCM,Solvent=Water)`, or always ask? PCM vs
-   SMD has real consequences for relative energies.
-3. **Output parsing — cclib or roll our own?** cclib is mature and
-   handles many edge cases but adds a dependency; a thin custom parser
-   for the specific keywords v2 supports is leaner but rots faster.
+2. **Solvation defaults.** *Answered (2026-05-07): default to SMD when
+   the user says "in water" or names a solvent.* SMD outperforms
+   IEF-PCM by ~3–5 kcal/mol RMSD on aqueous solvation free energies
+   (SAMPL benchmarks); PCM stays available as an opt-in flag for users
+   matching older literature.
+3. **Output parsing — cclib or roll our own?** *Answered (2026-05-07):
+   cclib.* ASE's own `read_gaussian_out` deliberately does not parse
+   frequencies, so a Freq workflow must use cclib regardless. Adding
+   the cclib dependency is cheaper than maintaining a regex parser
+   for thermochem blocks that change route-line-by-route-line.
 4. **Resource defaults — `%mem` and `%nprocshared`.** These belong in
    the input deck and depend on the host. How does the skill know
    what's safe? Probe `psutil` at script time, or always require the

@@ -37,39 +37,56 @@ one production engine is on `PATH`:
 
 | Check | Purpose |
 |---|---|
-| `shutil.which("sander")` | reference MD engine, ships with AmberTools (free) |
-| `shutil.which("pmemd")` | production MD engine, license-restricted |
+| `shutil.which("sander")` | reference MD engine, ships with AmberTools |
+| `shutil.which("pmemd")` | production CPU MD engine, ships with AmberTools25 |
+| `shutil.which("pmemd.cuda")` | production GPU MD engine, ships with AmberTools25 |
 | `shutil.which("tleap")` | system-prep tool — needed for end-to-end workflows |
+| `shutil.which("antechamber")` | small-molecule parameterization — needed for GAFF2 |
 | `os.environ.get("AMBERHOME")` | install root; used to disambiguate multiple installs |
 
 Reporting rule: the backend is "available" if **either** `sander` or
 `pmemd` resolves on `PATH`. Report whichever resolved and the resolved
 path (so users with multi-install boxes can see which one will be
-picked). `tleap` is a separate concern — note it as missing if absent
-even when `sander` is present, because v2 system-prep workflows need
-it.
+picked). `tleap` and `antechamber` are separate concerns — note each
+as missing if absent even when an MD engine is present, because v2
+system-prep workflows need them.
 
-Do **not** check whether the license server is reachable. Amber is
-mostly free now (AmberTools) but pmemd.cuda still needs a license at
-some sites; license-server probing is fragile and out of scope for the
-env check.
+As of AmberTools25, the entire Amber suite — including `pmemd.cuda` —
+is open-source and license-free. There is no license server to probe;
+remove any "license-restricted" reasoning from older docs.
+
+A constraint that does need to be documented at detection time:
+**`ase.calculators.amber.Amber` is single-point only.** It re-launches
+`sander` once per `calculate()` call, which is fine for a frozen
+single-point but catastrophic for MD (the per-step subprocess overhead
+dwarfs the actual integration cost). It also **rejects non-orthogonal
+cells** in `write_coordinates()`, which kills truncated-octahedron
+solvation through the calculator path. v2 therefore uses **shell-out
+to `pmemd` / `sander` directly**, not the ASE Amber calculator, for
+the integration loop. ASE's role is structure I/O at the boundaries.
 
 ## §3. Scope when implemented (v2)
 
 When v2 work begins on Amber, the chapter that replaces this stub will
 cover:
 
-- Protein and nucleic-acid MD with **ff14SB / ff19SB / OL15** (ff14SB
-  default for proteins, OL15 default for nucleic acids).
-- **GAFF / GAFF2** for small organic molecules where a force field beats
-  GFN2-xTB on cost.
-- Basic system preparation via `tleap`: solvation in a TIP3P box,
-  neutralizing counter-ions, simple disulfide handling.
-- Short equilibration runs via `sander` (minimization → heating →
-  density equilibration → short NVT).
-- Production MD via `pmemd` (or `pmemd.cuda` when a GPU is detected),
-  driven from an ASE-style script that writes Amber input decks and
-  parses the `.nc` trajectory back.
+- Protein MD with **ff19SB + OPC** (the post-2020 community default;
+  ff14SB is one generation behind and stays as a legacy fallback for
+  users with existing TIP3P-built systems).
+- Nucleic-acid MD with **OL21** (the OL15 → OL21 update is now standard).
+- **GAFF2** for small organic molecules — default — with **AM1-BCC**
+  charges from `antechamber`. Plain `GAFF` stays as a legacy option
+  for users coming from older Amber tutorials.
+- Basic system preparation via `tleap`: solvation in a TIP3P or OPC
+  box, neutralizing counter-ions, simple disulfide handling.
+- Short equilibration runs (minimization → heating → density
+  equilibration → short NVT) using `sander` for minimization and
+  `pmemd` / `pmemd.cuda` for the dynamics stages — `sander` is too slow
+  for production MD past minimization.
+- Production MD via `pmemd.cuda` when a GPU is detected, else `pmemd`,
+  driven from a Python orchestrator that writes Amber input decks
+  (`mdin`) and parses the `.nc` trajectory back. **Not** driven through
+  `ase.calculators.amber.Amber` (see §2 for why).
 - Trajectory analysis via the existing `analyze_traj.py` plus MDAnalysis
   (no new analysis code; `.nc` reading already works).
 
@@ -102,11 +119,13 @@ answer them.
    submission templates, or do users have group-specific templates that
    should be respected? (v1 has no submission story at all, so this
    question lands fresh.)
-4. **ASE-Amber bridge vs shell-out.** `ase.calculators.amber` exists
-   but is thin and underused. Is it worth investing in (in-process
-   MD via Amber-as-calculator), or should v2 just write input decks
-   and parse output files?
-5. **Default equilibration protocol.** Skill-bundled defaults
-   (min → heat → density → short prod) or always user-driven? Bundling
-   is more useful but locks in opinions; user-driven is more flexible
-   but reads as "the skill doesn't actually help."
+4. **ASE-Amber bridge vs shell-out.** *Answered (2026-05-07): shell-out.*
+   Reading the ASE source confirmed `ase.calculators.amber.Amber` is
+   single-point only and rejects non-orthogonal cells; both make it
+   unusable as an MD integrator. v2 writes input decks and parses
+   output files; ASE handles structure I/O at the boundaries.
+5. **Default equilibration protocol.** *Answered (2026-05-07): bundle
+   min → heat → density → prod as `--protocol standard`, expose
+   individual stages as flags.* This matches what AmberMDrun, the
+   BioExcel tutorials, and the AMBER manual all document; refusing
+   to bundle reads as the skill not actually helping.
