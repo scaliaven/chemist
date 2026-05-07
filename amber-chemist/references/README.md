@@ -1,4 +1,4 @@
-# amberchemist References — Index
+# amber-chemist References — Index
 
 Reference files are topic-scoped: read the one matching your task,
 not the whole index. The MD core, REMD, and add-ons are the
@@ -31,4 +31,4 @@ honest deferrals.
 
 - [`failure_modes.md`](failure_modes.md) — Known failure modes across prep / MD / REMD / analysis / scoring, with recovery recipes.
 - [`extension_map.md`](extension_map.md) — Big Amber features not yet shipped (TI/FEP, aMD, SMD, umbrella, H-REMD, QM/MM, constant-pH, membrane, PLUMED, multi-GPU): which script each one would land in. Cite this for honest deferrals.
-- [`carveout_relationship.md`](carveout_relationship.md) — How `amberchemist` relates to `ase-simulation`'s v1.3 carve-out. Cite when the user is on a shared-zone prompt and wonders which skill should answer.
+- [`carveout_relationship.md`](carveout_relationship.md) — How `amber-chemist` relates to `ase-chemist`'s v1.3 carve-out. Cite when the user is on a shared-zone prompt and wonders which skill should answer.

@@ -2,7 +2,7 @@
 """Detect Amber-stack tools and print a tagged status report.
 
 When to use:
-    Run this once at the start of any non-trivial amberchemist task. The
+    Run this once at the start of any non-trivial amber-chemist task. The
     output determines which workflows the skill should recommend (REMD
     needs MPI; MMPBSA needs MMPBSA.py; alanine-scan needs ParmEd).
 
@@ -220,7 +220,7 @@ def main() -> int:
         lines.append("[MISSING] numpy")
 
     if ase_v:
-        lines.append(f"[INFO] ASE {ase_v} detected — not required by amberchemist")
+        lines.append(f"[INFO] ASE {ase_v} detected — not required by amber-chemist")
 
     # Capability summary
     capabilities: list[str] = []

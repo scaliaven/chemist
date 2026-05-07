@@ -1,4 +1,4 @@
-"""Shared helpers for amberchemist scripts.
+"""Shared helpers for amber-chemist scripts.
 
 Engine selection, mdin renderers, tleap factories, groupfile / temperature
 ladder builders, mdout / rem.log parsers. Every script in this skill imports
@@ -59,7 +59,7 @@ def pick_engine(preferred: Optional[str] = None, *, need_mpi: bool = False) -> s
 
 # ---------------------------------------------------------------------------
 # mdin renderers — the v1.3 carve-out templates plus barostat / restraint /
-# implicit-GB blocks parameterized for amberchemist's wider scope.
+# implicit-GB blocks parameterized for amber-chemist's wider scope.
 # ---------------------------------------------------------------------------
 
 def _restraint_block(mask: Optional[str], weight: float) -> str:

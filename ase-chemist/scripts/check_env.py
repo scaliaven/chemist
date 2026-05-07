@@ -2,7 +2,7 @@
 """Detect installed simulation backends and print a tagged status report.
 
 When to use:
-    Run this once at the start of any non-trivial ase-simulation task. The
+    Run this once at the start of any non-trivial ase-chemist task. The
     output determines which calculator the skill should recommend.
 
 When NOT to use:

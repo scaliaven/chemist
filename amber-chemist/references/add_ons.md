@@ -101,7 +101,7 @@ A reference file should be:
 - Recipe-style (drop-in commands the model can paste).
 - One topic.
 - ~100-300 lines max. If it grows past that, split into sub-files
-  using `<topic>_<aspect>.md` like `ase-simulation`'s reference
+  using `<topic>_<aspect>.md` like `ase-chemist`'s reference
   refactor.
 
 ### 7. mdin-flag-only changes — prefer flags

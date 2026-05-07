@@ -2,7 +2,7 @@
 
 Consolidated list of known issues across prep, MD, REMD, analysis,
 and scoring. Each entry has the symptom, the cause, and the fix.
-Superset of `ase-simulation/references/amber_failure_modes.md`.
+Superset of `ase-chemist/references/amber_failure_modes.md`.
 
 ## Prep (`amber_prep.py`)
 
@@ -166,8 +166,8 @@ sets it). Some scripts (especially MMPBSA.py) read `$AMBERHOME` at
 runtime.
 
 ### "[BROKEN] tblite C extension unloadable" (from sibling skill)
-**Cause:** not relevant to amberchemist — that's `ase-simulation`'s
-xTB path. amberchemist does not use tblite.
+**Cause:** not relevant to amber-chemist — that's `ase-chemist`'s
+xTB path. amber-chemist does not use tblite.
 
 ## When the failure isn't here
 

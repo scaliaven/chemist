@@ -121,7 +121,7 @@ and speeds up cpptraj significantly on large boxes.
 - `<prefix>_<analysis>.csv` — CSV with the dat header.
 - `<prefix>_<analysis>.png` — matplotlib line plot (frame vs value).
 
-This matches `ase-simulation/scripts/analyze_traj.py`'s shape so
+This matches `ase-chemist/scripts/analyze_traj.py`'s shape so
 users get consistent file layouts across the two skills.
 
 ## Common failure modes

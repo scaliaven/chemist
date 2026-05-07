@@ -7,7 +7,7 @@ amber_remd.py / amber_run.py and writes one CSV + one PNG per analysis.
 When to use:
     The user has a finished .nc trajectory and a .prmtop and wants
     standard MD observables. Outputs match the shape of
-    `ase-simulation/scripts/analyze_traj.py` so users get consistent
+    `ase-chemist/scripts/analyze_traj.py` so users get consistent
     file layouts across the two skills.
 
 When NOT to use:

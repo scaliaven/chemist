@@ -59,7 +59,7 @@ When a user asks for a feature this skill does not ship:
 These are out of Amber's lane entirely; the user should be pointed
 at a different tool:
 
-- **VASP, Quantum ESPRESSO, CP2K, FHI-aims** — solid-state DFT codes; not Amber. See `ase-simulation` for ASE bridges (deferred there too).
+- **VASP, Quantum ESPRESSO, CP2K, FHI-aims** — solid-state DFT codes; not Amber. See `ase-chemist` for ASE bridges (deferred there too).
 - **GROMACS, NAMD, OpenMM** — different MD engines. We don't bridge to them.
 - **Schrödinger, MOE, Maestro** — commercial workflow tools.
 - **AlphaFold, RoseTTAFold** — structure prediction, not MD.
@@ -78,7 +78,7 @@ reasons we defer:
    opinion on anything. Better to ship a focused MD core well.
 3. **Routing surface.** Every shipped feature grows SKILL.md's
    description and increases the chance of trigger collisions with
-   `ase-simulation` or other future skills. Defer until usage data
+   `ase-chemist` or other future skills. Defer until usage data
    shows demand.
 
 When usage data does justify a row, the architectural change is

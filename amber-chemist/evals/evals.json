@@ -1,5 +1,5 @@
 {
-  "_comment": "5 evaluation prompts for amberchemist v1.0. Free-form expected outputs for manual review; no programmatic assertions in v1.0.",
+  "_comment": "5 evaluation prompts for amber-chemist v1.0. Free-form expected outputs for manual review; no programmatic assertions in v1.0.",
   "evals": [
     {
       "id": "e1_md_standard",

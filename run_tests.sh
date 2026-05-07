@@ -9,7 +9,7 @@ mkdir -p "$OUT"
 
 # Non-gating environment summary; helps interpret skill behavior in logs.
 if [ -x "$(command -v python)" ]; then
-  python amberchemist/scripts/check_env.py --summary-only > "$OUT/amberchemist_env.txt" 2>&1 || true
+  python amber-chemist/scripts/check_env.py --summary-only > "$OUT/amber-chemist_env.txt" 2>&1 || true
 fi
 
 # Per-run wall-clock limit. 180s is enough for Claude to read SKILL.md,
@@ -69,7 +69,7 @@ run_one p5_build_struct  trigger     "Build a Pt(111) surface, 4 layers, 4x4, wi
 # "run a 5000-atom system") and the method-selection rule that points
 # past the xTB cliff at MACE.
 run_one p10_mace_named   trigger     "Run NVT MD on test-inputs/caffeine.xyz at 300 K for 50 ps using MACE-OFF. Write the script; don't execute it."
-run_one p11_size_cliff   trigger     "I want to run molecular dynamics on a 5000-atom organic system. What's the right approach with the ase-simulation tools? Don't run anything; just walk me through method selection."
+run_one p11_size_cliff   trigger     "I want to run molecular dynamics on a 5000-atom organic system. What's the right approach with the ase-chemist tools? Don't run anything; just walk me through method selection."
 
 # v1.3 — Amber GAFF2 small-molecule MD. Tests the antechamber / GAFF2 /
 # explicit-solvent triggers added in SKILL.md description and the new
@@ -80,7 +80,7 @@ run_one p13_antechamber  trigger     "Parameterize the molecule in test-inputs/c
 # v1.3 borderline — protein MD is deferred to v2.3. Skill should still
 # trigger but explain the v1.3 limit honestly (BYO-prmtop with run_amber.py;
 # ff19SB+OPC support is v2.3 territory).
-run_one p14_protein_md   borderline  "I want to run MD on a protein in explicit solvent. How would you approach it with the ase-simulation tools? Don't run anything."
+run_one p14_protein_md   borderline  "I want to run MD on a protein in explicit solvent. How would you approach it with the ase-chemist tools? Don't run anything."
 
 # v1.4 — Gaussian DFT (SP / Opt / Freq). Tests the trigger contract for
 # DFT-named methods (B3LYP, ωB97X-D, def2-TZVP), the no-defaults policy
@@ -99,7 +99,7 @@ run_one p7_python_only   no_trigger  "Write a Python function that takes a list 
 run_one p8_definitional  borderline  "Explain the difference between NVT and NPT ensembles."
 run_one p9_borderline    borderline  "How does Langevin dynamics work?"
 
-# amberchemist v1.0 trigger tests. MD core (a1-a4), REMD core (a3, a5, a11),
+# amber-chemist v1.0 trigger tests. MD core (a1-a4), REMD core (a3, a5, a11),
 # add-ons (a6-a9). Borderlines at the bottom: deferred features (a13) and
 # missing-MPI (a14) test honest deferral.
 run_one a1_md_named         trigger     "Run 5 ns of GAFF2 explicit-solvent MD on test-inputs/caffeine.xyz in TIP3P, NPT at 300 K with the Monte Carlo barostat. Net charge 0. Write the scripts; don't execute."

@@ -8,7 +8,7 @@ Part of the v1.3 Amber reference set. Companion files:
 [`amber.md`](amber.md).
 
 > **⚠️ Architectural carve-out.** Amber is **the only engine in
-> `ase-simulation` that does not run through ASE.** Every other backend
+> `ase-chemist` that does not run through ASE.** Every other backend
 > in the skill (EMT, LJ, TIP3P, tblite/xTB, MACE) is wrapped as an ASE
 > `Calculator` and driven by ASE optimizers / MD integrators in-process.
 > Amber bypasses all of that: `parameterize_gaff2.py` and `run_amber.py`

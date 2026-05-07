@@ -1,7 +1,7 @@
-# amberchemist (v1.0)
+# amber-chemist (v1.0)
 
 Amber-native molecular dynamics skill for Claude Code. Sibling to
-`ase-simulation`. Focused on **MD-first** workflows: single-replica MD
+`ase-chemist`. Focused on **MD-first** workflows: single-replica MD
 plus Temperature Replica-Exchange (T-REMD), with cpptraj-driven
 analysis and MMPBSA endpoint scoring as add-ons.
 
@@ -56,7 +56,7 @@ The skill defers honestly when asked for any of these. See
 ## Layout
 
 ```
-amberchemist/
+amber-chemist/
 ├── SKILL.md                 # trigger contract + method-selection tree
 ├── README.md                # this file
 ├── scripts/
@@ -89,11 +89,11 @@ amberchemist/
     └── evals.json
 ```
 
-## Relationship with `ase-simulation`
+## Relationship with `ase-chemist`
 
-`ase-simulation` ships a v1.3 Amber carve-out (`parameterize_gaff2.py`
+`ase-chemist` ships a v1.3 Amber carve-out (`parameterize_gaff2.py`
 + `run_amber.py`) that does GAFF2-only plain NPT small-molecule MD.
-`amberchemist` is the deeper Amber-native sibling: restart-and-extend,
+`amber-chemist` is the deeper Amber-native sibling: restart-and-extend,
 REMD, implicit solvent, cpptraj-driven analysis, MMPBSA scoring. The
 two skills coexist; the trigger-phrase split routes prompts to the
 right one. See `references/carveout_relationship.md` for the

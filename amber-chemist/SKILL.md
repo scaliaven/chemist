@@ -1,17 +1,17 @@
 ---
-name: amberchemist
-description: Use this skill whenever the user wants to run, set up, restart, extend, or replicate Amber-native molecular dynamics — single-replica or replica-exchange — on small organics in explicit or implicit solvent. After the MD finishes, this skill also drives cpptraj-based analysis (RMSD/RMSF/RDF/hbond/radgyr, per-frame energy decomposition via esander) and MMPBSA-style endpoint scoring (MMPBSA / MMGBSA, alanine scan, per-residue decomposition) as add-ons that consume the MD output. MD-core trigger phrases — "Amber MD", "production NPT in pmemd", "1 ns of explicit-solvent MD", "Berendsen barostat", "Monte Carlo barostat", "Langevin thermostat at gamma_ln", "extend my prod by 5 ns", "restart from this rst7", "implicit-solvent MD", "GB implicit", "GBneck2", "igb=2", "OBC", "min → heat → density → prod", "production pmemd run", "pmemd.cuda", "antechamber", "parmchk2", "tleap", "AmberTools", "AmberTools25", "GAFF2", "AM1-BCC", "explicit-solvent ligand binding", "TIP3P+GAFF2 production". REMD trigger phrases — "T-REMD", "temperature REMD", "replica exchange", "parallel tempering", "exchange every", "temperature ladder", "geometric replica ladder", "exchange acceptance rate", "pmemd.cuda.MPI -rem 1", "demux REMD". Add-on trigger phrases (after-MD framing) — "MMPBSA", "MMGBSA", "endpoint binding free energy", "GB binding free energy", "PB binding free energy", "alanine scan", "per-residue decomposition", "score this trajectory", "cpptraj", "esander", "RMSD via cpptraj", "RMSF via cpptraj", "hbond analysis", "radgyr", "RDF of solvent around ligand", "per-frame energy decomposition". Routing — Amber-deep prompts (REMD, MMPBSA, cpptraj, ff19SB, OL21, esander, GB-implicit MD, alanine scan) reach this skill; ASE-shaped prompts (HOMO-LUMO, xTB, MACE, EMT, Gaussian DFT, slab building, Pt(111)) reach the sibling `ase-simulation` skill. The shared zone — GAFF2 + AM1-BCC + TIP3P + plain MD — is genuinely shared and either skill produces a correct answer.
+name: amber-chemist
+description: Use this skill whenever the user wants to run, set up, restart, extend, or replicate Amber-native molecular dynamics — single-replica or replica-exchange — on small organics in explicit or implicit solvent. After the MD finishes, this skill also drives cpptraj-based analysis (RMSD/RMSF/RDF/hbond/radgyr, per-frame energy decomposition via esander) and MMPBSA-style endpoint scoring (MMPBSA / MMGBSA, alanine scan, per-residue decomposition) as add-ons that consume the MD output. MD-core trigger phrases — "Amber MD", "production NPT in pmemd", "1 ns of explicit-solvent MD", "Berendsen barostat", "Monte Carlo barostat", "Langevin thermostat at gamma_ln", "extend my prod by 5 ns", "restart from this rst7", "implicit-solvent MD", "GB implicit", "GBneck2", "igb=2", "OBC", "min → heat → density → prod", "production pmemd run", "pmemd.cuda", "antechamber", "parmchk2", "tleap", "AmberTools", "AmberTools25", "GAFF2", "AM1-BCC", "explicit-solvent ligand binding", "TIP3P+GAFF2 production". REMD trigger phrases — "T-REMD", "temperature REMD", "replica exchange", "parallel tempering", "exchange every", "temperature ladder", "geometric replica ladder", "exchange acceptance rate", "pmemd.cuda.MPI -rem 1", "demux REMD". Add-on trigger phrases (after-MD framing) — "MMPBSA", "MMGBSA", "endpoint binding free energy", "GB binding free energy", "PB binding free energy", "alanine scan", "per-residue decomposition", "score this trajectory", "cpptraj", "esander", "RMSD via cpptraj", "RMSF via cpptraj", "hbond analysis", "radgyr", "RDF of solvent around ligand", "per-frame energy decomposition". Routing — Amber-deep prompts (REMD, MMPBSA, cpptraj, ff19SB, OL21, esander, GB-implicit MD, alanine scan) reach this skill; ASE-shaped prompts (HOMO-LUMO, xTB, MACE, EMT, Gaussian DFT, slab building, Pt(111)) reach the sibling `ase-chemist` skill. The shared zone — GAFF2 + AM1-BCC + TIP3P + plain MD — is genuinely shared and either skill produces a correct answer.
 license: MIT
 ---
 
-# amberchemist Skill (v1.0)
+# amber-chemist Skill (v1.0)
 
-This skill is the Amber-native sibling to `ase-simulation`. It is
+This skill is the Amber-native sibling to `ase-chemist`. It is
 **MD-first**: the v1.0 verb is normal (single-replica) MD with
 configurable stages, restart-and-extend, restraints, barostat
 options, explicit or implicit solvent, and a verbatim-mdin escape
 hatch. **T-REMD** is built on top of that core and ships in v1.0
-too — currently the strongest differentiator vs `ase-simulation`'s
+too — currently the strongest differentiator vs `ase-chemist`'s
 narrower v1.3 carve-out (which cannot do REMD). Analysis (cpptraj)
 and endpoint scoring (MMPBSA) are add-ons that consume the MD
 output, not co-equal verbs.
@@ -75,15 +75,15 @@ on PATH. AmberTools25 is fully open-source, including pmemd.cuda; if
 the user is on a fresh install and missing pmemd.cuda, point them at
 `https://ambermd.org/GetAmber.php`.
 
-## Carve-out relationship with `ase-simulation`
+## Carve-out relationship with `ase-chemist`
 
-`ase-simulation` ships a v1.3 small-molecule Amber carve-out
+`ase-chemist` ships a v1.3 small-molecule Amber carve-out
 (`parameterize_gaff2.py` + `run_amber.py`) that does plain GAFF2
-NPT MD only. `amberchemist` is the **deeper Amber-native sibling**:
+NPT MD only. `amber-chemist` is the **deeper Amber-native sibling**:
 restart-and-extend, REMD, implicit solvent, cpptraj-driven analysis,
 MMPBSA scoring. The two skills coexist; routing falls out of the
 trigger-phrase split (Amber-deep phrases reach here; ASE-shaped
-phrases reach `ase-simulation`).
+phrases reach `ase-chemist`).
 
 If the user is on a prompt in the shared zone (GAFF2 + AM1-BCC +
 TIP3P + plain MD, no Amber-deep terms), either skill produces a

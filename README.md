@@ -1,11 +1,11 @@
-# asechemist
+# chemist
 
 > A development workspace for an Agent Skill that takes computational
 > chemistry seriously: documented method selection over feature-list
 > mentality, honest limits over silent fallbacks, mandatory cross-
 > validation over *"just trust the ML potential."*
 
-`asechemist` is the dev workspace for [`ase-simulation`](ase-simulation/),
+`chemist` is the dev workspace for [`ase-chemist`](ase-chemist/),
 a Claude Code skill for atomistic / molecular simulation. The skill
 bundles seven backends (ASE built-ins, tblite-xTB, MACE foundation
 models, Amber-GAFF2, Gaussian DFT) behind one method-selection router,
@@ -25,7 +25,7 @@ test fixtures, syncing the loaded copies, and shipping commits on
 Computational-chemistry tooling tends toward two failure modes:
 *"here are 50 tools, you figure it out"* (every general-purpose ASE
 script) and *"here's a black box, give me your structure"* (every
-opinionated wrapper). `ase-simulation` lands between them on a
+opinionated wrapper). `ase-chemist` lands between them on a
 specific design rigor:
 
 1. **Right method for the system, not for the request.** A *"minimize
@@ -63,22 +63,22 @@ that *"just works"* without guardrails, you'll find them in the way.
 
 For the user-facing version of this story (with concrete examples
 and the install path), see
-[`ase-simulation/README.md`](ase-simulation/README.md).
+[`ase-chemist/README.md`](ase-chemist/README.md).
 
 ---
 
 ## Layout
 
 ```
-asechemist/
-├── ase-simulation/                  # the skill itself (dev source — edit here)
+chemist/
+├── ase-chemist/                  # the skill itself (dev source — edit here)
 │   ├── SKILL.md                     # trigger contract + method-selection tree
 │   ├── README.md                    # the skill's user-facing README
 │   ├── scripts/                     # 12 scripts (one per task)
 │   ├── references/                  # 17 small scoped reference files
 │   └── evals/evals.json             # 5 prompts for manual review
-├── .claude/skills/ase-simulation/   # project skill copy (loaded by `claude -p`)
-├── ~/.claude/skills/ase-simulation/ # user skill copy (kept in parity)
+├── .claude/skills/ase-chemist/   # project skill copy (loaded by `claude -p`)
+├── ~/.claude/skills/ase-chemist/ # user skill copy (kept in parity)
 ├── PLAN.md                          # v2 vision + phase sequencing
 ├── CLAUDE.md                        # design decisions for Claude Code sessions
 ├── generate_test.py                 # fixture generator
@@ -87,15 +87,15 @@ asechemist/
 └── results/                         # per-run logs + .status (gitignored)
 ```
 
-The dev source under `ase-simulation/` and the loaded copies under
+The dev source under `ase-chemist/` and the loaded copies under
 `.claude/skills/` and `~/.claude/skills/` can drift. Tests run
 against the loaded copies. Sync after every edit:
 
 ```bash
-rsync -a --delete ase-simulation/ .claude/skills/ase-simulation/
-rsync -a --delete ase-simulation/ ~/.claude/skills/ase-simulation/
-diff -rq ase-simulation .claude/skills/ase-simulation     # confirm parity
-diff -rq ase-simulation ~/.claude/skills/ase-simulation
+rsync -a --delete ase-chemist/ .claude/skills/ase-chemist/
+rsync -a --delete ase-chemist/ ~/.claude/skills/ase-chemist/
+diff -rq ase-chemist .claude/skills/ase-chemist     # confirm parity
+diff -rq ase-chemist ~/.claude/skills/ase-chemist
 ```
 
 [`PLAN.md`](PLAN.md) §"Sequencing rules" says wait until trigger
@@ -113,7 +113,7 @@ conda install -c conda-forge ambertools             # Amber GAFF2 (v1.3+)
 # Gaussian: license-gated; install per https://gaussian.com/
 
 # 1. Sanity-check the simulation environment
-python ase-simulation/scripts/check_env.py
+python ase-chemist/scripts/check_env.py
 
 # 2. Regenerate fixtures (caffeine.xyz, cluster.xyz, ar108.xyz, md.traj)
 python generate_test.py
@@ -165,15 +165,15 @@ programmatic assertions; that's [v2.0](PLAN.md)'s job.
 
 ## Project documentation
 
-- [`ase-simulation/README.md`](ase-simulation/README.md) — the
+- [`ase-chemist/README.md`](ase-chemist/README.md) — the
   skill's user-facing README. Backends, examples, design principles,
   install. **Read this first if you want to understand what the
   skill does.**
-- [`ase-simulation/SKILL.md`](ase-simulation/SKILL.md) — the trigger
+- [`ase-chemist/SKILL.md`](ase-chemist/SKILL.md) — the trigger
   contract (description field), method-selection tree, scripts
   catalog. Editing the description field regresses or improves
   activation; treat it as load-bearing.
-- [`ase-simulation/references/`](ase-simulation/references/) — 17
+- [`ase-chemist/references/`](ase-chemist/references/) — 17
   small scoped reference files (1–4k chars each). The umbrella files
   (`ml_potentials.md`, `amber.md`, `gaussian.md`) are thin indices
   that point at sub-files for the specific topic — read only the
