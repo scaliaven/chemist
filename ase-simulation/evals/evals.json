@@ -1,0 +1,37 @@
+{
+  "skill": "ase-simulation",
+  "version": "v1",
+  "schema_notes": "Each eval has id, prompt, expected_output (free-form prose for human review), and files (relative paths the eval depends on; empty for v1). v1 has NO programmatic assertions — that comes in iteration 2 once we know which behaviors are stable.",
+  "evals": [
+    {
+      "id": "opt-small-molecule-xtb",
+      "prompt": "Optimize the geometry of methanol (CH3OH) using GFN2-xTB. Tell me the final energy in eV, the maximum force at convergence, and how many steps it took. Save the optimized structure as methanol_opt.xyz.",
+      "expected_output": "Skill should: (1) run check_env.py and confirm tblite is installed, (2) build CH3OH via ase.build.molecule('CH3OH') OR via the optimize.py script with a written input, (3) use scripts/optimize.py with --calculator xtb --xtb-method GFN2-xTB --fmax 0.05, (4) report final energy (around -715 eV in tblite's reference frame), max force <= 0.05 eV/Å, step count, and confirm methanol_opt.xyz exists. Should NOT silently fall back to EMT (which doesn't know carbon-oxygen chemistry well enough).",
+      "files": []
+    },
+    {
+      "id": "md-emt-no-xtb-required",
+      "prompt": "Run a 5 ps NVT molecular dynamics simulation of a small Cu cluster (say 32 atoms) at 500 K with EMT. Save the trajectory and log every 100 steps.",
+      "expected_output": "Skill should: (1) build a Cu structure via ase.build.bulk('Cu', 'fcc', a=3.61) or fcc111, sized to ~32 atoms, (2) run scripts/run_md.py with --calculator emt --ensemble nvt-langevin --temperature 500 --timestep 5.0 --n-steps 1000 (5 ps with 5 fs timestep, EMT can handle this for metals) OR --timestep 1.0 --n-steps 5000, (3) report wall time, instantaneous T, and where the trajectory landed. Note: this eval is intentionally do-able WITHOUT tblite — confirms the fallback path works.",
+      "files": []
+    },
+    {
+      "id": "vibrational-analysis",
+      "prompt": "Compute the vibrational frequencies of water (H2O) using GFN2-xTB. List the three normal-mode frequencies in cm^-1 and identify which one is the bend.",
+      "expected_output": "Skill should: (1) build H2O with molecule('H2O'), (2) optimize with tblite GFN2-xTB to fmax <= 0.01 eV/Å (tighter than default! reference: ase_core.md), (3) run ase.vibrations.Vibrations, (4) report three frequencies — typically ~1600 cm^-1 (bend), ~3700 cm^-1 (symmetric stretch), ~3800 cm^-1 (antisymmetric stretch) for GFN2-xTB; exact numbers vary. Bend = lowest of the three real-valued frequencies. Should write inline code rather than reach for a script (no script for vibrations in v1).",
+      "files": []
+    },
+    {
+      "id": "build-pt111-with-co",
+      "prompt": "Build a Pt(111) slab, 4x4 surface, 4 layers, 10 Å vacuum, with a single CO molecule adsorbed on-top. Optimize the geometry with EMT and tell me the adsorption energy.",
+      "expected_output": "Skill should: (1) use ase.build.fcc111('Pt', size=(4,4,4), vacuum=10.0), (2) use ase.build.add_adsorbate(slab, molecule('CO'), height=2.0, position='ontop'), (3) optimize with EMT (Pt + C + O are all in EMT's element set), (4) compute adsorption energy as E(slab+CO) - E(slab) - E(CO) using two extra single-points. Should use scripts/optimize.py for the slab-with-CO; the two reference single-points can be inline. Caveat-note that EMT-on-Pt-CO is qualitative only.",
+      "files": []
+    },
+    {
+      "id": "analyze-traj-rmsd-rdf",
+      "prompt": "Here's an MD trajectory of liquid water from a previous run: run_water.traj. Tell me whether it equilibrated by frame 100, plot RMSD over time, and compute the O-O radial distribution function out to 6 Å. Save plots.",
+      "expected_output": "Skill should: (1) run scripts/analyze_traj.py --trajectory run_water.traj --reference-frame 100 --rdf-elements O O --rdf-rmax 6.0, (2) read the resulting rmsd.png/csv and energy.png/csv to assess equilibration (instantaneous T fluctuating around target, no monotonic energy drift), (3) describe the RDF — first peak around 2.8 Å for liquid water, second peak around 4.5 Å, going to 1.0 at large r. (4) report file paths to all generated plots.",
+      "files": ["run_water.traj"]
+    }
+  ]
+}
