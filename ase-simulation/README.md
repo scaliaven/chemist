@@ -61,7 +61,10 @@ ase-simulation/
 ├── references/
 │   ├── ase_core.md       # ASE I/O, build, optimizers, MD integrators, vibrations, NEB
 │   ├── xtb.md            # tblite install, GFN1/GFN2/GFN0/GFN-FF, observables, limits
-│   └── analysis.md       # trajectory analysis recipes (ASE vs MDAnalysis)
+│   ├── analysis.md       # trajectory analysis recipes (ASE vs MDAnalysis)
+│   ├── amber.md          # STUB — v2 scope + detection spec; not implemented
+│   ├── gaussian.md       # STUB — v2 scope + detection spec; not implemented
+│   └── ml_potentials.md  # STUB — v2 scope + detection spec; not implemented
 ├── scripts/
 │   ├── check_env.py      # detect installed backends, capability summary
 │   ├── optimize.py       # BFGS/FIRE/LBFGS with convergence reporting
@@ -84,6 +87,16 @@ ase-simulation/
 - **Solvation and free energy**: implicit solvent beyond xTB's ALPB,
   thermodynamic integration, metadynamics.
 - **NEB script**: a turnkey CLI for transition-state searches.
+
+The Amber, Gaussian, and ML-potential v2 chapters have **stub reference
+files** in `references/` that document the intended scope, the
+detection logic for each backend, and a list of open questions to be
+answered by real-usage data before v2 work begins. The stubs are not
+implementations and should not be followed as workflows.
+`scripts/check_env.py` already reports detection status for these
+backends in a `[v2 preview]` block (after the v1 capability summary)
+so users can see what is on their box even though the skill cannot
+drive it yet.
 
 ## Notes for skill developers
 

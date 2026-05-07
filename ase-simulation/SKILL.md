@@ -300,6 +300,16 @@ comes up; do not preload them all.
   `analyze_traj.py` implements, common pitfalls (alignment, periodic
   unwrapping).
 
+The following reference files are **stubs for v2** — they document
+intended scope and detection logic but are **not implementations**.
+Do not follow them as workflows. If a user asks about one of these
+backends, point at the stub for an honest description of the limit
+and pick a v1-supported alternative.
+
+- `references/amber.md`         (stub — planned for v2, not implemented)
+- `references/gaussian.md`      (stub — planned for v2, not implemented)
+- `references/ml_potentials.md` (stub — planned for v2, not implemented)
+
 ## Defaults and conventions
 
 - **Units**: ASE uses eV, Å, ASE-time-units. Use `ase.units.fs` /

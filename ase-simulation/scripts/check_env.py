@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import os
 import shutil
 import sys
 from typing import Optional
@@ -48,6 +49,111 @@ def _probe_tblite_ase() -> Optional[str]:
     except Exception as e:
         return str(e)
     return None
+
+
+def _v2_preview_lines() -> list[str]:
+    """Detection block for v2 backends (Amber, Gaussian, ML potentials).
+
+    None of these affect the v1 capability summary. Each line is prefixed
+    with [v2 preview] so it is grep-friendly and visually separate from
+    v1 status lines. "Available" here means "detected on the system" — it
+    does NOT mean "supported by the skill yet"; the trailing arrow on each
+    backend points at the stub reference that explains the limit.
+    """
+    out: list[str] = []
+    out.append(
+        "[v2 preview] (detection only — these backends are NOT yet "
+        "supported by the skill)"
+    )
+
+    # --- Amber ---
+    sander = shutil.which("sander")
+    pmemd = shutil.which("pmemd")
+    tleap = shutil.which("tleap")
+    amber_home = os.environ.get("AMBERHOME")
+    if sander or pmemd:
+        engine, path = ("sander", sander) if sander else ("pmemd", pmemd)
+        out.append(f"[v2 preview] Amber:    available ({engine} at {path})")
+        if not tleap:
+            out.append(
+                "[v2 preview]            note: tleap not on PATH — "
+                "v2 system prep will need it"
+            )
+        if not amber_home:
+            out.append(
+                "[v2 preview]            note: AMBERHOME unset — "
+                "environment may not be sourced"
+            )
+        out.append(
+            "[v2 preview]            → not yet supported by skill, "
+            "see references/amber.md"
+        )
+    else:
+        out.append("[v2 preview] Amber:    not detected")
+        out.append(
+            "[v2 preview]            → planned for v2, "
+            "see references/amber.md"
+        )
+
+    # --- Gaussian ---
+    g16 = shutil.which("g16")
+    g09 = shutil.which("g09")
+    gauss_exedir = os.environ.get("GAUSS_EXEDIR")
+    gauss_scrdir = os.environ.get("GAUSS_SCRDIR")
+    if g16 or g09:
+        version, path = ("g16", g16) if g16 else ("g09", g09)
+        out.append(f"[v2 preview] Gaussian: available ({version} at {path})")
+        if not gauss_exedir:
+            out.append(
+                "[v2 preview]            note: GAUSS_EXEDIR unset — "
+                "Gaussian env may not be sourced"
+            )
+        if not gauss_scrdir:
+            out.append(
+                "[v2 preview]            note: GAUSS_SCRDIR unset — "
+                "scratch path required for non-trivial jobs"
+            )
+        out.append(
+            "[v2 preview]            → not yet supported by skill, "
+            "see references/gaussian.md"
+        )
+    else:
+        out.append("[v2 preview] Gaussian: not detected")
+        out.append(
+            "[v2 preview]            → planned for v2, "
+            "see references/gaussian.md"
+        )
+
+    # --- ML potentials ---
+    ml_packages = [
+        ("MACE",     "mace_torch"),
+        ("CHGNet",   "chgnet"),
+        ("M3GNet",   "matgl"),
+        ("SevenNet", "sevenn"),
+        ("Orb",      "orb_models"),
+    ]
+    any_ml_available = False
+    for label, modname in ml_packages:
+        version = _try_import(modname)
+        if version:
+            any_ml_available = True
+            out.append(
+                f"[v2 preview] {label + ':':<10}available ({modname} {version})"
+            )
+        else:
+            out.append(f"[v2 preview] {label + ':':<10}not installed")
+    if any_ml_available:
+        out.append(
+            "[v2 preview]            → not yet supported by skill, "
+            "see references/ml_potentials.md"
+        )
+    else:
+        out.append(
+            "[v2 preview]            → ML potentials planned for v2, "
+            "see references/ml_potentials.md"
+        )
+
+    return out
 
 
 def main() -> int:
@@ -189,13 +295,21 @@ def main() -> int:
             "pip install ase tblite mdanalysis matplotlib"
         )
 
-    lines.append(f"[SUMMARY] {summary}")
+    summary_line = f"[SUMMARY] {summary}"
+    lines.append(summary_line)
 
     if args.summary_only:
-        print(lines[-1])
-    else:
-        for line in lines:
-            print(line)
+        print(summary_line)
+        return 0 if ase_version else 1
+
+    for line in lines:
+        print(line)
+
+    # v2 backends — printed AFTER the v1 summary, separated by a blank line
+    # so they cannot be mistaken for currently-supported capabilities.
+    print()
+    for line in _v2_preview_lines():
+        print(line)
 
     return 0 if ase_version else 1
 
