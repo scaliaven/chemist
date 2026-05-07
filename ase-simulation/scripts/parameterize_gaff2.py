@@ -160,6 +160,15 @@ def main() -> int:
                    help="Keep antechamber's .ac / .sqm scratch files.")
     args = p.parse_args()
 
+    print("[gaff2] CARVE-OUT NOTE: parameterization runs through AmberTools")
+    print("[gaff2]   binaries (antechamber/parmchk2/tleap), NOT through ASE.")
+    print("[gaff2]   The resulting .prmtop/.rst7 feeds run_amber.py for MD")
+    print("[gaff2]   (also non-ASE). Amber is the only engine in")
+    print("[gaff2]   ase-simulation that bypasses ASE; carve-out is under")
+    print("[gaff2]   review for removal. See references/amber.md §1 and")
+    print("[gaff2]   PLAN.md §Phase 3.")
+    print()
+
     check_binaries()
 
     src = Path(args.structure).resolve()

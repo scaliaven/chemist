@@ -109,6 +109,20 @@ Apply the first rule that fits the system, in this order:
    added); GAFF2 is the right tool for that task and the v1.3 scripts
    handle the antechamber → tleap → pmemd pipeline. See
    `references/amber.md` for force-field and water-model details.*
+
+   > **⚠️ Architecture note (v1.3 Amber).** Amber is the **only engine in
+   > the skill that does not run through ASE**. `parameterize_gaff2.py`
+   > and `run_amber.py` shell out to AmberTools and pmemd directly; the
+   > MD integration loop runs natively in pmemd, not in ASE. ASE handles
+   > structure I/O at the boundaries and post-hoc analysis via
+   > `analyze_traj.py`, but the simulation itself is opaque to ASE. The
+   > carve-out is forced — `ase.calculators.amber.Amber` is single-point
+   > only and rejects non-orthogonal cells, both fatal for production
+   > MD. **This is a known architectural inconsistency and the v1.3
+   > Amber path may be removed** if the wart outweighs its value; see
+   > `PLAN.md` §"Phase 3" for the open question. When recommending
+   > GAFF2 to the user, surface the carve-out honestly so they can
+   > decide whether they want it.
 5. **If the system is a transition-metal complex and GFN2 fails to
    converge**, fall back to **GFN1-xTB**. *Why:* GFN1 is more robust on
    d-block elements at the cost of some accuracy.
@@ -273,7 +287,10 @@ Per-script use:
   or BYO-prmtop runs where the topology was generated outside the
   skill. **Note:** v1.3's `mdin` defaults are tuned for GAFF2
   small molecules; protein/NA prmtop files will run but may want
-  different cutoffs / restraints.
+  different cutoffs / restraints. **Architectural carve-out:** the
+  MD loop runs in pmemd, not ASE. The script prints this on every
+  invocation; see the architecture note above for the rationale and
+  the open question on whether to keep this engine in the skill at all.
 - **`scripts/single_point.py`** — Single-point energy plus xTB electronic
   observables (dipole, Mulliken charges, Wiberg bond orders, HOMO-LUMO
   raw eigenvalue gap). Tagged `key=value` output. Optimize first —

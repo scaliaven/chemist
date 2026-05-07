@@ -1,5 +1,28 @@
 # Amber Reference (v1.3 — GAFF2 small-molecule MD)
 
+> **⚠️ Architectural carve-out.** Amber is **the only engine in
+> `ase-simulation` that does not run through ASE.** Every other backend
+> in the skill (EMT, LJ, TIP3P, tblite/xTB, MACE) is wrapped as an ASE
+> `Calculator` and driven by ASE optimizers / MD integrators in-process.
+> Amber bypasses all of that: `parameterize_gaff2.py` and `run_amber.py`
+> shell out to AmberTools binaries (`antechamber`, `parmchk2`, `tleap`)
+> and Amber MD engines (`pmemd.cuda` / `pmemd` / `sander`) via
+> `subprocess.run`. The MD integration loop runs **natively in pmemd**;
+> ASE only sees the input structure on the way in and the NetCDF `.nc`
+> trajectory on the way out (handed to `analyze_traj.py` for analysis).
+>
+> This was forced rather than chosen — see §2 below for why
+> `ase.calculators.amber.Amber` is unusable as an MD integrator. But
+> the cost is real: the carve-out breaks the "everything orchestrated
+> through ASE" framing the rest of the skill maintains, and it doubles
+> the surface area new contributors have to learn.
+>
+> **The v1.3 Amber path is under review for removal.** If usage data
+> shows GAFF2 small-molecule MD is rarely requested, the right call may
+> be to drop these scripts entirely and tell users honestly that
+> `ase-simulation` doesn't ship a classical MM backend. See
+> [`PLAN.md`](../../PLAN.md) §"Phase 3" for the open decision.
+
 This file replaces the v2 stub for the **GAFF2 small-molecule path**.
 v1.3 ships:
 

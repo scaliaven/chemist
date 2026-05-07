@@ -212,6 +212,17 @@ def main() -> int:
                    help="Production step count (500 ps at 2 fs default).")
     args = p.parse_args()
 
+    print("[amber] CARVE-OUT NOTE: the MD integration loop runs natively in")
+    print("[amber]   pmemd / pmemd.cuda / sander, NOT through ASE. Amber is")
+    print("[amber]   the only engine in ase-simulation that bypasses ASE;")
+    print("[amber]   ase.calculators.amber.Amber is single-point only and")
+    print("[amber]   rejects non-orthogonal cells, both fatal for MD. ASE")
+    print("[amber]   handles structure I/O at the boundaries; the simulation")
+    print("[amber]   itself is opaque to ASE. This carve-out is under review")
+    print("[amber]   for removal — see references/amber.md §1 and PLAN.md")
+    print("[amber]   §Phase 3.")
+    print()
+
     if args.protocol and args.stage:
         raise SystemExit("--protocol and --stage are mutually exclusive.")
     if not args.protocol and not args.stage:

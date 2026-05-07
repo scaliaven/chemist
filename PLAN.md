@@ -176,12 +176,27 @@ tleap-from-PDB system prep for biomolecules; multi-GPU pmemd.cuda.
 These come from the original §4 stub questions plus subagent flags.
 Update PLAN.md as each lands or as data arrives.
 
+- **Amber path: keep or remove?** v1.3 ships GAFF2 small-molecule MD via
+  shell-out to AmberTools and pmemd. **Amber is the only engine in
+  `ase-simulation` that does not run through ASE** (every other backend
+  is wrapped as an ASE Calculator and driven in-process). The carve-out
+  is forced — `ase.calculators.amber.Amber` is single-point only and
+  rejects non-orthogonal cells, both fatal for MD — but it does break
+  the "everything orchestrated through ASE" framing the rest of the
+  skill maintains, and it doubles the surface area new contributors
+  have to learn (mdin templates, antechamber pipeline, NetCDF I/O,
+  engine-selection edge cases). **Decision criterion:** if usage data
+  shows GAFF2 small-molecule MD is rarely requested (e.g., < ~5% of
+  v1.3 invocations), the right call is to drop the v1.3 Amber path and
+  tell users honestly that the skill doesn't ship a classical MM
+  backend. If usage is heavy, the carve-out warts are worth keeping.
+  Revisit at the same 2-week mark as the other usage-data questions.
 - **ML**: molecules-vs-materials audience balance; system-size
   distribution; whether mandatory cross-validation overhead is
   acceptable; GPU prevalence among skill users.
-- **Amber-GAFF2**: dominant ask (drug-like organics vs peptides vs
-  carbohydrates); SLURM submission ownership; whether the skill should
-  bundle equilibration protocols or always defer.
+- **Amber-GAFF2 (if kept)**: dominant ask (drug-like organics vs
+  peptides vs carbohydrates); SLURM submission ownership; whether the
+  skill should bundle equilibration protocols or always defer.
 - **Gaussian** (v2.4 candidate): method/basis defaults for organics vs
   transition metals; resource defaults (`%mem`, `%nproc`); local vs
   queue submission.
