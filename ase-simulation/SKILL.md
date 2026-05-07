@@ -170,6 +170,24 @@ a non-standard ensemble (NPT, constrained dynamics), or a one-shot
 is narrow — a missing flag or an unexposed parameter — prefer **adding
 the flag to the script** and using it over a one-off inline rewrite.
 
+**When inline is allowed — and what doesn't count.** Going inline
+requires a *specific, named* capability that the bundled script lacks
+(e.g., "run_md.py has no `--barostat` flag, and the user asked for
+NPT"). A reader should be able to confirm the gap by running the
+script's `--help`. The following are **not** justifications:
+
+- *User phrasing.* "Write the script", "give me a script", "show me
+  the code" — the bundled CLI invocation **is** a script. Treat
+  these phrases as satisfied by the one-liner.
+- *Readability or pedagogy.* If you want to show the user what's
+  happening, point at `scripts/<name>.py` and describe it; don't
+  retype it.
+- *Tweaks already covered by flags.* A different fmax, timestep,
+  ensemble, calculator, or seed is what the flags exist for.
+
+If you go inline, name the gap in one sentence before the code. No
+sentence → no carve-out → use the bundled CLI.
+
 Per-script use:
 
 - **`scripts/check_env.py`** — Reports installed backends and a one-line
