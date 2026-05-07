@@ -1,13 +1,16 @@
-# ase-simulation (v1.3)
+# ase-simulation (v1.4)
 
 An Agent Skill for running molecular dynamics, geometry optimization, and
 quantum-chemistry calculations using ASE (Atomic Simulation Environment) as
 the orchestration layer. The design philosophy is **traditional trusted
 methods first, ML acceleration as a layered extension** — v1.2 added MACE
 foundation-model support with a mandatory cross-validation contract
-against GFN2-xTB; v1.3 adds GAFF2 small-molecule MD via the
+against GFN2-xTB; v1.3 added GAFF2 small-molecule MD via the
 antechamber → tleap → pmemd pipeline so production explicit-solvent runs
-have a real backend instead of an apologetic redirect to xTB.
+have a real backend instead of an apologetic redirect to xTB; **v1.4 adds
+DFT-quality Gaussian SP / Opt / Freq** through `ase.calculators.gaussian.
+Gaussian` so the skill has a real DFT backend (not just semi-empirical
+xTB) when accuracy matters.
 
 ## Install
 
@@ -36,6 +39,16 @@ pip install mace-torch
 conda install -c conda-forge ambertools   # or follow https://ambermd.org/GetAmber.php
 ```
 
+**Optional — Gaussian DFT (v1.4+):**
+
+```bash
+# Gaussian is license-gated; install per https://gaussian.com/
+# Source the env so g16 (or g09) is on PATH and GAUSS_EXEDIR / GAUSS_SCRDIR are set.
+
+# cclib is required for gaussian_freq.py thermochem parsing:
+pip install cclib
+```
+
 `tblite` provides GFN1-xTB and GFN2-xTB. For GFN0 / GFN-FF you also need the
 standalone `xtb` binary on `PATH` (e.g., `conda install -c conda-forge xtb`).
 `mace-torch` provides MACE-MP-0 (89-element materials) and MACE-OFF (10-element
@@ -59,17 +72,28 @@ After install, sanity check:
 python ase-simulation/scripts/check_env.py
 ```
 
-## What's in v1.3
+## What's in v1.4
 
 - **Calculators**: ASE built-ins (EMT, Lennard-Jones, TIP3P), tblite
-  (GFN1-xTB, GFN2-xTB), and **MACE** (MACE-MP-0 for materials, MACE-OFF
-  for organics; auto-routed by element set).
+  (GFN1-xTB, GFN2-xTB), **MACE** (MACE-MP-0 for materials, MACE-OFF
+  for organics; auto-routed by element set), and **Gaussian** (DFT
+  via `ase.calculators.gaussian.Gaussian`, g16 or g09).
+- **DFT calculations via Gaussian** (v1.4+): single-point E/F/dipole
+  (`scripts/gaussian_sp.py`), geometry optimization via
+  `GaussianOptimizer` (`scripts/gaussian_opt.py`), frequency +
+  thermochemistry (`scripts/gaussian_freq.py`, parsed via cclib).
+  No method/basis defaults — the scripts require explicit
+  `--method`, `--basis`, `--charge`, `--mult`, `--mem`, `--nproc`.
+  SMD as the documented water-solvent default. **Goes through ASE's
+  Gaussian Calculator** (no Amber-style carve-out).
 - **Classical small-molecule MD via Amber + GAFF2** (v1.3+): the
   antechamber AM1-BCC → parmchk2 → tleap (TIP3P/OPC solvation) →
   pmemd pipeline, driven by `scripts/parameterize_gaff2.py` and
   `scripts/run_amber.py`. Standard protocol = min → heat (50 ps NVT) →
   density (100 ps NPT) → prod (default 500 ps NPT). Engine
-  auto-selection prefers `pmemd.cuda` when available.
+  auto-selection prefers `pmemd.cuda` when available. **Architectural
+  carve-out** (only engine in the skill that bypasses ASE; under
+  review — see `references/amber.md` §1 and `PLAN.md` §Phase 3).
 - **Geometry optimization**: BFGS, FIRE, LBFGS via `scripts/optimize.py`.
   All five calculator backends supported.
 - **Molecular dynamics**: NVE (VelocityVerlet), NVT (Langevin or
@@ -101,9 +125,9 @@ ase-simulation/
 │   ├── analysis.md          # trajectory analysis recipes (ASE vs MDAnalysis)
 │   ├── ml_potentials.md     # MACE method-selection, cross-validation contract, failure modes
 │   ├── amber.md             # GAFF2 small-mol pipeline; protein/NA deferred to v2.3
-│   └── gaussian.md          # STUB — v2.4 scope + detection spec; not implemented
+│   └── gaussian.md          # v1.4 DFT SP/Opt/Freq via ase.calculators.gaussian
 ├── scripts/
-│   ├── check_env.py             # detect installed backends, capability summary, CUDA + Amber status
+│   ├── check_env.py             # detect installed backends, capability summary, CUDA + Amber + Gaussian status
 │   ├── optimize.py              # BFGS/FIRE/LBFGS with convergence reporting; supports MACE
 │   ├── run_md.py                # NVE / NVT-Langevin / NVT-Nose-Hoover; MACE w/ auto cross-validation
 │   ├── single_point.py          # E + dipole/charges/HOMO-LUMO via tblite
@@ -111,7 +135,10 @@ ase-simulation/
 │   ├── ml_calculator.py         # MACE factory: auto-routes MACE-OFF vs MACE-MP-0 by elements
 │   ├── validate_ml_md.py        # post-hoc cross-validation of MACE trajectories vs GFN2-xTB
 │   ├── parameterize_gaff2.py    # antechamber AM1-BCC -> parmchk2 -> tleap -> .prmtop/.rst7
-│   └── run_amber.py             # Amber MD: min/heat/density/prod via pmemd.cuda/pmemd/sander
+│   ├── run_amber.py             # Amber MD: min/heat/density/prod via pmemd.cuda/pmemd/sander
+│   ├── gaussian_sp.py           # DFT SP via ase.calculators.gaussian.Gaussian; cclib for charges/MO
+│   ├── gaussian_opt.py          # DFT Opt via GaussianOptimizer (Gaussian L103)
+│   └── gaussian_freq.py         # DFT Freq + thermochem via cclib parse
 └── evals/
     └── evals.json        # 5 realistic prompts, no automated assertions yet
 ```
@@ -126,9 +153,12 @@ ase-simulation/
   pdb4amber, disulfide handling, capping. v1.3 ships only the GAFF2
   small-molecule path — biopolymer prep is its own design problem
   (see `references/amber.md` §1, §7).
-- **Gaussian DFT (v2.4)**: SP / Opt / Freq / SMD via `ase.calculators.
-  gaussian.Gaussian` + cclib for output parsing. License-gated; no
-  method/basis defaults — explicit user input required.
+- **Gaussian extended scope (v3+)**: transition-state searches
+  (`Opt=TS`, QST2/QST3) with IRC verification, anharmonic frequencies,
+  NBO/NPA via cclib's NBO parser dep, post-HF (CCSD/MP2/CASSCF),
+  excited states (TDDFT/CIS/EOM-CCSD). v1.4 ships SP / Opt / Freq /
+  SMD; the rest is documented as out-of-scope in
+  `references/gaussian.md` §7.
 - **HPC submission helpers**: SLURM templates, queueing, restart logic.
 - **Free energy and enhanced sampling**: TI / FEP / MBAR, REMD,
   metadynamics, umbrella sampling. These are research workflows with
@@ -136,15 +166,10 @@ ase-simulation/
   not in scope for v2.x.
 - **NEB script**: a turnkey CLI for transition-state searches.
 
-The remaining Gaussian chapter is a **stub reference file** in
-`references/` that documents the intended scope, the detection logic
-for the backend, and a list of open questions to be answered by
-real-usage data before v2.4 work begins. The stub is not an
-implementation and should not be followed as a workflow.
-`scripts/check_env.py` reports detection status for it in a
-`[v2 preview]` block (after the v1 capability summary) so users can
-see what is on their box even though the skill cannot drive it yet.
-See `PLAN.md` for the full sequencing.
+`scripts/check_env.py` reports detection status for v2.2+ ML potentials
+(CHGNet, M3GNet, SevenNet, Orb) in a `[v2 preview]` block so users
+can see what is on their box even though the skill cannot drive them
+yet. See `PLAN.md` for the full sequencing.
 
 ## Notes for skill developers
 

@@ -1,10 +1,10 @@
 ---
 name: ase-simulation
-description: Use this skill whenever the user wants to run, set up, or analyze atomistic simulations on molecules or materials. This covers: molecular dynamics (MD, NVE, NVT, NPT, Langevin, Nose-Hoover) including thermalization, equilibration, and "warm up the system" requests; geometry optimization, energy minimization, or relaxation (BFGS, FIRE, LBFGS — "minimize this molecule", "relax this structure", "find the equilibrium geometry"); vibrational frequency, normal-mode, Hessian, and zero-point-energy analysis; NEB and transition-state searches; structure building (small molecules, bulk crystals, surfaces like fcc111, slabs with adsorbates); trajectory analysis (RMSD, RMSF, RDF, energy drift); single-point energy and force evaluation; binding, interaction, and adsorption energy calculations; explicit-solvent small-molecule MD with GAFF2 + AM1-BCC charges via antechamber and pmemd; and electronic observables like HOMO-LUMO gap, dipole moment, or Mulliken charges. Use this skill for any request involving force fields (GAFF2, AM1-BCC, classical MM), semi-empirical methods (xTB / GFN1 / GFN2), foundation-model ML potentials (MACE-MP-0, MACE-OFF), DFT-style reasoning about which method to pick, or any computational chemistry / materials task that mentions ASE, EMT, Lennard-Jones, TIP3P, tblite, xtb, MACE, antechamber, tleap, sander, or pmemd. Reach for this skill even when the user does not name ASE — phrases like "minimize this molecule", "relax this geometry", "thermalize at 300 K", "equilibrate the system", "compute the binding energy", "run MD on water", "build a Pt(111) slab", "compute frequencies", "speed up this MD with a foundation model", "use MACE", "run a 5000-atom system", "ligand MD in water", "GAFF2 parameterization", "AM1-BCC charges", "explicit-solvent MD of this drug molecule", or "antechamber" should all trigger this skill.
+description: Use this skill whenever the user wants to run, set up, or analyze atomistic simulations on molecules or materials. This covers: molecular dynamics (MD, NVE, NVT, NPT, Langevin, Nose-Hoover) including thermalization, equilibration, and "warm up the system" requests; geometry optimization, energy minimization, or relaxation (BFGS, FIRE, LBFGS — "minimize this molecule", "relax this structure", "find the equilibrium geometry"); vibrational frequency, normal-mode, Hessian, and zero-point-energy analysis; NEB and transition-state searches; structure building (small molecules, bulk crystals, surfaces like fcc111, slabs with adsorbates); trajectory analysis (RMSD, RMSF, RDF, energy drift); single-point energy and force evaluation; binding, interaction, and adsorption energy calculations; explicit-solvent small-molecule MD with GAFF2 + AM1-BCC charges via antechamber and pmemd; **DFT calculations via Gaussian — single-point energies, geometry optimization, frequency / thermochemistry analysis (ZPE, enthalpy, Gibbs free energy)** with B3LYP / ωB97X-D / M06-2X / PBE0 etc.; and electronic observables like HOMO-LUMO gap, dipole moment, or Mulliken charges. Use this skill for any request involving force fields (GAFF2, AM1-BCC, classical MM), semi-empirical methods (xTB / GFN1 / GFN2), foundation-model ML potentials (MACE-MP-0, MACE-OFF), DFT through Gaussian (B3LYP, ωB97X-D, M06-2X, PBE0, def2-TZVP, 6-31G(d), SMD/PCM solvation), DFT-style reasoning about which method to pick, or any computational chemistry / materials task that mentions ASE, EMT, Lennard-Jones, TIP3P, tblite, xtb, MACE, antechamber, tleap, sander, pmemd, Gaussian, g16, g09, or cclib. Reach for this skill even when the user does not name ASE — phrases like "minimize this molecule", "relax this geometry", "thermalize at 300 K", "equilibrate the system", "compute the binding energy", "run MD on water", "build a Pt(111) slab", "compute frequencies", "speed up this MD with a foundation model", "use MACE", "run a 5000-atom system", "ligand MD in water", "GAFF2 parameterization", "AM1-BCC charges", "explicit-solvent MD of this drug molecule", "antechamber", "run a DFT calculation", "compute thermochemistry at B3LYP/def2-TZVP", "Gibbs free energy of this reaction", "Gaussian SMD water", or "DFT frequency analysis" should all trigger this skill.
 license: MIT
 ---
 
-# ASE Simulation Skill (v1.3)
+# ASE Simulation Skill (v1.4)
 
 ## Always do this first
 
@@ -65,9 +65,12 @@ and you should keep walking.
 | Optimize / minimize / relax | `scripts/optimize.py` | FIRE for far-from-equilibrium, BFGS otherwise |
 | MD at temperature T | `scripts/run_md.py` | Langevin NVT is the default ensemble |
 | Production explicit-solvent MD on a small organic | `scripts/parameterize_gaff2.py` then `scripts/run_amber.py` | GAFF2 + AM1-BCC, TIP3P/OPC water, min/heat/density/prod via pmemd. See `references/amber.md` |
-| Vibrations / Hessian / ZPE | `ase.vibrations.Vibrations` inline | Optimize to fmax ≤ 0.01 first, or you get spurious imaginary modes |
-| HOMO-LUMO / dipole / charges | `scripts/single_point.py` (with `--calculator xtb`) | Returns gap, dipole, Mulliken charges, bond orders. **HOMO-LUMO is the raw eigenvalue gap — see `references/xtb.md` for the convention.** |
-| Binding / interaction / adsorption energy | three runs of `scripts/single_point.py` | E(complex) − E(A) − E(B); use the same calculator for all three |
+| **DFT single-point** (energy / forces / dipole / charges at DFT level) | `scripts/gaussian_sp.py` | wraps `ase.calculators.gaussian.Gaussian`; cclib for charges/MO. **No method/basis defaults — refuse without `--method`/`--basis`/`--charge`/`--mult`/`--mem`/`--nproc`.** |
+| **DFT geometry optimization** | `scripts/gaussian_opt.py` | uses `GaussianOptimizer` (Gaussian L103 — much faster than ASE-BFGS-around-Gaussian-SP). `--convergence tight` for Freq input. |
+| **DFT frequency + thermochemistry** | `scripts/gaussian_freq.py` | Freq job parsed via cclib (ASE doesn't parse vib frequencies). Tighten the optimization first. |
+| Vibrations / Hessian / ZPE (xTB-level) | `ase.vibrations.Vibrations` inline | Optimize to fmax ≤ 0.01 first, or you get spurious imaginary modes |
+| HOMO-LUMO / dipole / charges | `scripts/single_point.py` (with `--calculator xtb`) | Returns gap, dipole, Mulliken charges, bond orders. **HOMO-LUMO is the raw eigenvalue gap — see `references/xtb.md` for the convention.** For DFT-level HOMO/LUMO, use `gaussian_sp.py` with cclib. |
+| Binding / interaction / adsorption energy | three runs of `scripts/single_point.py` (or `gaussian_sp.py` for DFT) | E(complex) − E(A) − E(B); use the same calculator for all three |
 | Transition state / barrier | NEB inline (see `references/ase_core.md`) | No turnkey script in v1 |
 | Build a structure | `ase.build` inline | molecule / bulk / fcc111 / add_adsorbate |
 | Analyze a trajectory | `scripts/analyze_traj.py` | RMSD / RMSF / energy drift / optional RDF |
@@ -155,6 +158,18 @@ Apply the first rule that fits the system, in this order:
    slated to add larger ML potentials (CHGNet, Orb) and v2.3 adds
    Amber for biomolecular MD beyond GAFF2 small molecules." See
    `references/ase_core.md` §Appendix for the full size table.
+8. **If the user explicitly wants DFT** (B3LYP, ωB97X-D, M06-2X,
+   PBE0, post-HF, "publication thermochem", "transition-metal
+   barriers within 1 kcal/mol", or "compute G298") and Gaussian is
+   available — use **`gaussian_sp.py` / `gaussian_opt.py` /
+   `gaussian_freq.py`**. *Why:* xTB tops out at ~few-kcal/mol error
+   on relative energies and is unreliable on transition metals;
+   DFT is the right tool. **No method/basis defaults** — surface a
+   recommendation (ωB97X-D/def2-TZVP for organics; PBE0-D3(BJ)/def2-
+   TZVP for transition metals; see `references/gaussian.md` §1) and
+   confirm before running. The scripts also require explicit
+   `--charge`, `--mult`, `--mem`, `--nproc`. Solvent → SMD by
+   default. Freq workflow needs cclib (`pip install cclib`).
 
 ### Step 3 — confirm the calculator is installed
 
@@ -300,6 +315,29 @@ Per-script use:
   MD loop runs in pmemd, not ASE. The script prints this on every
   invocation; see the architecture note above for the rationale and
   the open question on whether to keep this engine in the skill at all.
+- **`scripts/gaussian_sp.py`** — DFT single-point E/F/dipole via
+  `ase.calculators.gaussian.Gaussian`; auto-falls back to g09 if g16
+  isn't on PATH. Optional cclib parse for Mulliken/Löwdin/Hirshfeld
+  charges and HOMO/LUMO eigenvalues. **All of `--method`, `--basis`,
+  `--charge`, `--multiplicity`, `--mem`, `--nproc` are required —
+  no silent defaults**, surface a recommendation and confirm. SMD
+  is the documented water-solvent default. **Use for:** any DFT
+  single-point request — energy, forces, dipole, MO eigenvalues,
+  partial charges at DFT level.
+- **`scripts/gaussian_opt.py`** — DFT geometry optimization via
+  `GaussianOptimizer` (delegates to Gaussian's L103 internal
+  optimizer in one g16/g09 invocation). `--convergence` is a string
+  (`loose`/`default`/`tight`/`verytight`), not a numeric eV/Å —
+  Gaussian's convention. Use `tight` or `verytight` if the
+  optimized geometry feeds into a Freq job. **Use for:** any
+  DFT-level optimization, especially as Freq input.
+- **`scripts/gaussian_freq.py`** — DFT frequency + thermochemistry
+  (vib_freqs / ZPE / enthalpy / Gibbs G), parsed via **cclib**
+  (mandatory dep — ASE's read_gaussian_out doesn't parse vib
+  frequencies). Reports imaginary modes as a warning. **Use for:**
+  thermochem on a tightly-optimized geometry. The freq method/basis
+  must match the optimization method/basis; the script doesn't
+  enforce this — surface it to the user.
 - **`scripts/single_point.py`** — Single-point energy plus xTB electronic
   observables (dipole, Mulliken charges, Wiberg bond orders, HOMO-LUMO
   raw eigenvalue gap). Tagged `key=value` output. Optimize first —
@@ -407,14 +445,15 @@ comes up; do not preload them all.
   failure modes (charge parity, antechamber aromatic perception, box
   sizing), troubleshooting. Protein/NA MD via ff19SB+OPC / OL21 is
   deferred to v2.3 — the `mdin` defaults in v1.3 are GAFF2-tuned.
-
-The following reference file is a **stub for v2.4** — it documents
-intended scope and detection logic but is **not an implementation**.
-Do not follow it as a workflow. If a user asks about Gaussian, point
-at the stub for an honest description of the limit and pick a
-v1-supported alternative (GFN2-xTB for similar accuracy on organics).
-
-- `references/gaussian.md`      (stub — planned for v2.4)
+- **`references/gaussian.md`** — Read for: when Gaussian beats xTB,
+  the no-defaults policy + recommended method/basis choices
+  (ωB97X-D/def2-TZVP for organics, PBE0-D3(BJ)/def2-TZVP for TM),
+  SMD vs PCM solvation, g16 vs g09 differences, cclib coverage
+  (vib_freqs, thermochem, MO eigenvalues, Mulliken/Löwdin/Hirshfeld
+  charges; NPA out of scope), known failure modes (multiplicity
+  errors, solvation mismatch across SP/Opt/Freq chain, GAUSS_SCRDIR
+  issues), troubleshooting. Opt=TS / IRC / NBO / TDDFT / post-HF
+  are explicitly deferred to v3+.
 
 ## Defaults and conventions
 
@@ -452,8 +491,12 @@ Tell the user honestly when their request crosses the line:
   to v2.3. Users with a `.prmtop` from their own workflow can still run
   `run_amber.py` against it; `mdin` defaults are GAFF2-tuned but most
   parameters are reasonable for biomolecules too — flag this honestly.
-- Gaussian (DFT) — planned for v2.4. If the user has g16/g09 on PATH,
-  `check_env.py` will report it under `[v2 preview]`.
+- Transition-state searches via Gaussian (`Opt=TS`, QST2/QST3) and
+  IRC — v1.4 ships SP / Opt / Freq, but not TS. TS needs a good
+  Hessian guess and IRC verification; push to v3+.
+- Anharmonic frequencies, NBO/NPA charges, post-Hartree-Fock methods
+  (CCSD/MP2/CASSCF), excited-state methods (TDDFT/CIS/EOM-CCSD) —
+  out of scope for v1.4 Gaussian; see `references/gaussian.md` §7.
 - VASP, Quantum ESPRESSO — no v2 plan; community CP2K / FHI-aims
   bridges may land in v3.
 - Other ML potentials — CHGNet (charge-aware materials), Orb-v3
@@ -464,6 +507,7 @@ Tell the user honestly when their request crosses the line:
   documented in `references/ml_potentials.md`."
 - Free energy methods (TI / FEP / MBAR), enhanced sampling (REMD,
   metadynamics, umbrella sampling), QM/MM, constant-pH MD.
-- RESP charges via Gaussian — v1.3 uses AM1-BCC only.
-- SLURM/HPC submission scripts.
+- RESP charges via Gaussian — v1.3 uses AM1-BCC for GAFF2 only.
+- SLURM/HPC submission scripts. Gaussian users wrap `gaussian_*.py`
+  in their own queue script.
 - Web GUI / visualization servers.

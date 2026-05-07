@@ -77,6 +77,18 @@ run_one p13_antechamber  trigger     "Parameterize the molecule in test-inputs/c
 # ff19SB+OPC support is v2.3 territory).
 run_one p14_protein_md   borderline  "I want to run MD on a protein in explicit solvent. How would you approach it with the ase-simulation tools? Don't run anything."
 
+# v1.4 — Gaussian DFT (SP / Opt / Freq). Tests the trigger contract for
+# DFT-named methods (B3LYP, ωB97X-D, def2-TZVP), the no-defaults policy
+# (skill should NOT silently pick method/basis), and the Freq+thermochem
+# task entry that points at gaussian_freq.py.
+run_one p15_gaussian_sp  trigger     "Compute a DFT single-point on test-inputs/caffeine.xyz at ωB97X-D / def2-TZVP, neutral closed-shell. Write the script; don't execute."
+run_one p16_gaussian_freq trigger    "I need Gibbs free energy at 298 K for caffeine at B3LYP-D3/def2-TZVP. Starting structure: test-inputs/caffeine.xyz. Write the optimize-then-freq pipeline; don't execute."
+
+# v1.4 borderline — user asks for DFT without specifying method/basis.
+# The no-defaults policy says the skill should refuse silent defaults;
+# it should ask or surface a recommendation, not just pick.
+run_one p17_dft_no_method borderline "Run a DFT calculation on test-inputs/caffeine.xyz. What's the right approach with this skill?"
+
 run_one p6_general_know  no_trigger  "What's the boiling point of water at 1 atm in Celsius?"
 run_one p7_python_only   no_trigger  "Write a Python function that takes a list of dicts and groups them by a key."
 run_one p8_definitional  borderline  "Explain the difference between NVT and NPT ensembles."

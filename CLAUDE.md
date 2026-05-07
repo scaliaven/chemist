@@ -6,10 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A development workspace for the **`ase-simulation` Agent Skill** (atomistic
 simulation orchestration on top of ASE / tblite-xTB / EMT / TIP3P, plus
-**MACE foundation models** in v1.2+ and **Amber GAFF2 small-molecule MD**
-in v1.3+). The repo contains the skill itself, a Layer B test harness that
-runs trigger / no-trigger prompts through `claude -p` in fresh sessions,
-and the input fixtures those prompts reference.
+**MACE foundation models** in v1.2+, **Amber GAFF2 small-molecule MD**
+in v1.3+, and **Gaussian DFT (SP / Opt / Freq)** in v1.4+). The repo
+contains the skill itself, a Layer B test harness that runs trigger /
+no-trigger prompts through `claude -p` in fresh sessions, and the input
+fixtures those prompts reference.
 
 This is **not** an application — there is no library to import and no service
 to run. Work here means editing the skill (SKILL.md, scripts, references) and
@@ -31,12 +32,15 @@ asechemist/
 │   │   ├── ml_calculator.py           # v1.2 — MACE factory (element-set routing, GPU detect)
 │   │   ├── validate_ml_md.py          # v1.2 — post-hoc cross-validation vs GFN2-xTB
 │   │   ├── parameterize_gaff2.py      # v1.3 — antechamber AM1-BCC -> parmchk2 -> tleap
-│   │   └── run_amber.py               # v1.3 — min/heat/density/prod via pmemd.cuda/pmemd/sander
+│   │   ├── run_amber.py               # v1.3 — min/heat/density/prod via pmemd.cuda/pmemd/sander
+│   │   ├── gaussian_sp.py             # v1.4 — DFT SP via ase.calculators.gaussian.Gaussian
+│   │   ├── gaussian_opt.py            # v1.4 — DFT Opt via GaussianOptimizer (L103)
+│   │   └── gaussian_freq.py           # v1.4 — DFT Freq + thermochem via cclib parse
 │   ├── references/
 │   │   ├── ase_core.md, xtb.md, analysis.md           # v1 references
 │   │   ├── ml_potentials.md           # v1.2 reference — MACE method-selection + cross-validation contract
 │   │   ├── amber.md                   # v1.3 reference — GAFF2 small-mol; protein/NA -> v2.3
-│   │   └── gaussian.md                # STUB — v2.4 scope + detection spec; NOT an implementation
+│   │   └── gaussian.md                # v1.4 reference — DFT SP/Opt/Freq; TS/IRC/NBO/post-HF -> v3+
 │   └── evals/evals.json               # 5 prompts; v1 has NO programmatic assertions
 ├── .claude/skills/ase-simulation/     # project-scoped copy of the skill
 ├── PLAN.md                            # v2 phase sequencing (Phase 0 -> 1 -> 2 -> deferred)
@@ -203,6 +207,11 @@ What v1.x ships today:
 - **v1.3** — Amber GAFF2 small-molecule MD via the antechamber AM1-BCC
   → parmchk2 → tleap → pmemd pipeline. `scripts/parameterize_gaff2.py`,
   `scripts/run_amber.py`.
+- **v1.4** — Gaussian DFT SP / Opt / Freq through `ase.calculators.
+  gaussian.Gaussian`. No method/basis defaults; SMD as documented
+  water-solvent default; cclib required for Freq thermochem parsing.
+  `scripts/gaussian_sp.py`, `scripts/gaussian_opt.py`,
+  `scripts/gaussian_freq.py`. **Goes through ASE** — no carve-out.
 
 What's deferred (do **not** add without raising scope first):
 
@@ -213,9 +222,11 @@ What's deferred (do **not** add without raising scope first):
   (nucleic acids), full tleap-from-PDB system prep with pdb4amber and
   disulfide handling. v1.3 ships only GAFF2; do not adapt the v1.3
   `mdin` defaults for proteins.
-- **v2.4** — Gaussian DFT (SP / Opt / Freq / SMD). `references/gaussian.md`
-  is the design stub; `check_env.py` reports `g16`/`g09` detection in
-  the `[v2 preview]` block.
+- **v3+** — Gaussian transition-state (`Opt=TS`, QST2/QST3, IRC),
+  anharmonic frequencies, NBO/NPA via cclib's NBO parser, post-HF
+  (CCSD/MP2/CASSCF), excited states (TDDFT/CIS/EOM-CCSD). v1.4 ships
+  SP/Opt/Freq/SMD; the rest is out of scope per
+  `references/gaussian.md` §7.
 - **No v2 plan** — VASP, Quantum ESPRESSO (community CP2K / FHI-aims
   bridges may land in v3), free-energy methods (TI / FEP / MBAR),
   enhanced sampling (REMD, metadynamics, umbrella sampling), QM/MM,
@@ -223,8 +234,8 @@ What's deferred (do **not** add without raising scope first):
   templates, web GUIs. These are listed in `ase-simulation/README.md`
   and `PLAN.md` Phase 3.
 
-`scripts/check_env.py` reports detection status for the v2.4 Gaussian
-backend and for v2.2+ ML potentials (CHGNet, M3GNet, SevenNet, Orb) in a
-`[v2 preview]` block so users see what is on their box without the skill
-pretending to drive it. Items previously in `[v2 preview]` (MACE, Amber)
-have been promoted to supported `[OK]`/`[MISSING]` lines.
+`scripts/check_env.py` reports detection status for v2.2+ ML potentials
+(CHGNet, M3GNet, SevenNet, Orb) in a `[v2 preview]` block so users see
+what is on their box without the skill pretending to drive it. Items
+previously in `[v2 preview]` (MACE, Amber, Gaussian) have been promoted
+to supported `[OK]`/`[MISSING]` lines.

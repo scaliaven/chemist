@@ -221,9 +221,15 @@ Update PLAN.md as each lands or as data arrives.
 - **Amber-GAFF2 (if kept)**: dominant ask (drug-like organics vs
   peptides vs carbohydrates); SLURM submission ownership; whether the
   skill should bundle equilibration protocols or always defer.
-- **Gaussian** (v2.4 candidate): method/basis defaults for organics vs
-  transition metals; resource defaults (`%mem`, `%nproc`); local vs
-  queue submission.
+- **Gaussian extended scope (v3+)**: should `Opt=TS` / IRC / NBO+NPA /
+  post-HF / TDDFT land? v1.4 deliberately ships SP/Opt/Freq/SMD only.
+  Each extension has its own design problem (TS needs Hessian-guess +
+  IRC; NPA needs cclib NBO parser; post-HF needs basis-set/disk
+  heuristics). Decision criterion: usage data showing which extension
+  has the loudest demand.
+- **Gaussian queue submission**: v1.4 runs locally only. SLURM
+  templates may land in v2.5+; for now users wrap `gaussian_*.py` in
+  their own queue script.
 
 ## Sequencing rules
 

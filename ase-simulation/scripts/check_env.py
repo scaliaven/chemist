@@ -105,35 +105,6 @@ def _v2_preview_lines() -> list[str]:
         "supported by the skill)"
     )
 
-    # --- Gaussian ---
-    g16 = shutil.which("g16")
-    g09 = shutil.which("g09")
-    gauss_exedir = os.environ.get("GAUSS_EXEDIR")
-    gauss_scrdir = os.environ.get("GAUSS_SCRDIR")
-    if g16 or g09:
-        version, path = ("g16", g16) if g16 else ("g09", g09)
-        out.append(f"[v2 preview] Gaussian: available ({version} at {path})")
-        if not gauss_exedir:
-            out.append(
-                "[v2 preview]            note: GAUSS_EXEDIR unset — "
-                "Gaussian env may not be sourced"
-            )
-        if not gauss_scrdir:
-            out.append(
-                "[v2 preview]            note: GAUSS_SCRDIR unset — "
-                "scratch path required for non-trivial jobs"
-            )
-        out.append(
-            "[v2 preview]            → not yet supported by skill, "
-            "see references/gaussian.md"
-        )
-    else:
-        out.append("[v2 preview] Gaussian: not detected")
-        out.append(
-            "[v2 preview]            → planned for v2, "
-            "see references/gaussian.md"
-        )
-
     # --- Other ML potentials (MACE has been promoted to a supported
     #     backend; CHGNet, M3GNet, SevenNet, Orb remain v2-preview).
     ml_packages = [
@@ -200,6 +171,13 @@ def main() -> int:
     pmemd_bin = shutil.which("pmemd")
     pmemd_cuda_bin = shutil.which("pmemd.cuda")
     amber_home = os.environ.get("AMBERHOME")
+
+    # Gaussian — promoted to supported in v1.4.
+    g16_bin = shutil.which("g16")
+    g09_bin = shutil.which("g09")
+    gauss_exedir = os.environ.get("GAUSS_EXEDIR")
+    gauss_scrdir = os.environ.get("GAUSS_SCRDIR")
+    cclib_version = _try_import("cclib")
 
     lines: list[str] = []
 
@@ -335,6 +313,45 @@ def main() -> int:
             "environment may not be fully sourced (some scripts depend on it)."
         )
 
+    # Gaussian (v1.4 supports SP / Opt / Freq via ase.calculators.gaussian.Gaussian)
+    if g16_bin:
+        lines.append(f"[OK] Gaussian — g16 at {g16_bin}")
+    elif g09_bin:
+        lines.append(
+            f"[OK] Gaussian — g09 at {g09_bin} (g16 not on PATH; gaussian_*.py "
+            "auto-falls back)"
+        )
+    else:
+        lines.append(
+            "[MISSING] Gaussian — neither g16 nor g09 on PATH. Required for "
+            "DFT-quality SP/Opt/Freq via gaussian_*.py. License-gated; see "
+            "https://gaussian.com/"
+        )
+
+    if (g16_bin or g09_bin) and not gauss_exedir:
+        lines.append(
+            "[INFO] GAUSS_EXEDIR unset — Gaussian binary is on PATH but the "
+            "environment may not be fully sourced. Source the Gaussian env "
+            "(e.g. `source $g16root/g16/bsd/g16.profile`) to set it."
+        )
+    if (g16_bin or g09_bin) and not gauss_scrdir:
+        lines.append(
+            "[INFO] GAUSS_SCRDIR unset — Gaussian writes scratch to its "
+            "default location, which may be a small filesystem. Set "
+            "GAUSS_SCRDIR to a fast, large-quota path for non-trivial jobs."
+        )
+
+    if cclib_version:
+        lines.append(
+            f"[OK] cclib {cclib_version} — required by gaussian_freq.py "
+            "(ASE's read_gaussian_out does not parse vibrational frequencies)"
+        )
+    else:
+        lines.append(
+            "[MISSING] cclib — required by gaussian_freq.py for thermochem "
+            "parsing. Install with: pip install cclib"
+        )
+
     # Analysis stack
     if mda_version:
         lines.append(f"[OK] MDAnalysis {mda_version}")
@@ -401,6 +418,15 @@ def main() -> int:
                 f"GAFF2 small-molecule MD with AM1-BCC charges "
                 f"(antechamber + tleap + {engine_label}; protein/NA "
                 f"deferred to v2.3)"
+            )
+        if g16_bin or g09_bin:
+            gauss_label = "g16" if g16_bin else "g09"
+            freq_label = (
+                "SP/Opt/Freq+thermochem" if cclib_version
+                else "SP/Opt (Freq needs cclib)"
+            )
+            capabilities.append(
+                f"Gaussian DFT {freq_label} via {gauss_label}"
             )
 
     if capabilities:
