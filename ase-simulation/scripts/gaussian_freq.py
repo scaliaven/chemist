@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Gaussian frequency analysis + thermochemistry, parsed via cclib.
+"""Gaussian frequency analysis + thermochemistry.
 
 When to use:
     The user wants vibrational frequencies, ZPE, enthalpy, and Gibbs
     free energy at DFT level. Inputs are a (typically tightly-)
     optimized geometry. Wraps ASE's Gaussian calculator with Freq in
     the route, runs g16/g09, and parses thermochem from the .log via
-    cclib.
+    an in-house parser (scripts/_gaussian_log.py) — no cclib dep.
 
 When NOT to use:
     The geometry isn't tight enough (--convergence default in
@@ -14,11 +14,6 @@ When NOT to use:
     --convergence tight or verytight first.
     Anharmonic corrections (Freq=Anharmonic) are out of scope for v1.4
     — they're expensive and need careful normal-mode follow-up.
-
-Required dependencies:
-    cclib. ASE's read_gaussian_out does NOT parse vibrational
-    frequencies, so we cannot avoid cclib for this script. Install
-    with: pip install cclib
 
 Defaults policy (v1.4):
     No method/basis defaults — same as gaussian_sp.py and
@@ -62,8 +57,9 @@ HARTREE_EV = 27.211386245988
 def main() -> int:
     p = argparse.ArgumentParser(
         description=(
-            "Gaussian Freq + thermochemistry, parsed via cclib. "
-            "Reports vib_freqs, ZPE, enthalpy, Gibbs free energy."
+            "Gaussian Freq + thermochemistry. Output parsed by the "
+            "in-house _gaussian_log.py helper (no cclib dep). Reports "
+            "vib_freqs, ZPE, enthalpy, Gibbs free energy."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
@@ -76,15 +72,7 @@ def main() -> int:
                    help="Label for .com / .log files.")
     args = p.parse_args()
 
-    try:
-        import cclib
-    except ImportError:
-        raise SystemExit(
-            "cclib is required for gaussian_freq.py — ASE's "
-            "read_gaussian_out does not parse vibrational frequencies. "
-            "Install with: pip install cclib"
-        )
-
+    from _gaussian_log import parse_thermochem
     from ase.calculators.gaussian import Gaussian
     from ase.io import read
 
@@ -130,24 +118,25 @@ def main() -> int:
     atoms.calc = calc
     energy = atoms.get_potential_energy()  # triggers the Freq run
 
-    # Parse thermochem out of the .log via cclib
+    # Parse thermochem out of the .log via the in-house parser.
     log_path = Path(f"{args.label}.log")
     if not log_path.exists():
         raise SystemExit(f"Expected Gaussian log at {log_path}, not found.")
-    data = cclib.io.ccopen(str(log_path)).parse()
+    thermo = parse_thermochem(log_path)
 
-    vibfreqs = getattr(data, "vibfreqs", None)
-    if vibfreqs is None or len(vibfreqs) == 0:
+    vibfreqs = thermo.get("vib_freqs")
+    if not vibfreqs:
         raise SystemExit(
-            "cclib parsed the log but found no vibrational frequencies. "
+            "Parsed the log but found no vibrational frequencies. "
             "Possible causes: (a) the Freq route keyword wasn't honored "
             "by Gaussian, (b) the input geometry was too far from a "
-            "stationary point and the SCF failed, (c) cclib version "
-            "mismatch with this Gaussian version. Inspect "
-            f"{log_path} for diagnostics."
+            "stationary point and the SCF failed, (c) the log uses an "
+            "output format the in-house parser doesn't recognize "
+            "(unusual — Gaussian's Freq output is normally stable). "
+            f"Inspect {log_path} for diagnostics."
         )
 
-    n_imag = int(sum(1 for f in vibfreqs if f < 0))
+    n_imag = thermo.get("n_imag", 0)
 
     print(f"[OK] electronic_energy_eV={energy:.6f}")
     print(f"[OK] n_vib_modes={len(vibfreqs)}")
@@ -161,24 +150,20 @@ def main() -> int:
               "verytight in gaussian_opt.py) and re-run, or accept the "
               "thermochem with a clear caveat.")
 
-    # ZPE / enthalpy / Gibbs from cclib (Hartree -> eV)
-    zpve = getattr(data, "zpve", None)
-    enthalpy = getattr(data, "enthalpy", None)
-    freeenergy = getattr(data, "freeenergy", None)
-    temperature = getattr(data, "temperature", args.temperature)
-
-    if zpve is not None:
-        print(f"[OK] ZPE_eV={zpve * HARTREE_EV:.4f}")
-    if enthalpy is not None:
-        print(f"[OK] enthalpy_H_eV={enthalpy * HARTREE_EV:.6f}")
-    if freeenergy is not None:
-        print(f"[OK] gibbs_G_eV={freeenergy * HARTREE_EV:.6f}")
+    if "zpe_eV" in thermo:
+        print(f"[OK] ZPE_eV={thermo['zpe_eV']:.4f}")
+    if "enthalpy_eV" in thermo:
+        print(f"[OK] enthalpy_H_eV={thermo['enthalpy_eV']:.6f}")
+    if "gibbs_eV" in thermo:
+        print(f"[OK] gibbs_G_eV={thermo['gibbs_eV']:.6f}")
+    temperature = thermo.get("temperature_K", args.temperature)
     print(f"[OK] thermo_temperature_K={temperature:.2f}")
 
+    gibbs_eV = thermo.get("gibbs_eV")
     print(f"[SUMMARY] Gaussian {args.method}/{args.basis} Freq: "
           f"{len(vibfreqs)} modes ({n_imag} imaginary), "
-          + (f"G = {freeenergy * HARTREE_EV:.4f} eV @ {temperature:.1f} K"
-             if freeenergy is not None else
+          + (f"G = {gibbs_eV:.4f} eV @ {temperature:.1f} K"
+             if gibbs_eV is not None else
              "thermochem partial — see [OK] lines above")
           + ".")
     return 0 if n_imag == 0 else 4

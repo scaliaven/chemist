@@ -159,6 +159,9 @@ def main() -> int:
     numpy_version = _try_import("numpy")
     mace_version = _try_import("mace")
     torch_version = _try_import("torch")
+    # Note: no cclib detection. Gaussian thermochem parsing is in-house
+    # (scripts/_gaussian_log.py) so the skill stays "everything through
+    # ASE-or-our-own-code".
 
     xtb_binary = shutil.which("xtb")
     cuda = _detect_cuda()
@@ -177,7 +180,6 @@ def main() -> int:
     g09_bin = shutil.which("g09")
     gauss_exedir = os.environ.get("GAUSS_EXEDIR")
     gauss_scrdir = os.environ.get("GAUSS_SCRDIR")
-    cclib_version = _try_import("cclib")
 
     lines: list[str] = []
 
@@ -341,17 +343,6 @@ def main() -> int:
             "GAUSS_SCRDIR to a fast, large-quota path for non-trivial jobs."
         )
 
-    if cclib_version:
-        lines.append(
-            f"[OK] cclib {cclib_version} — required by gaussian_freq.py "
-            "(ASE's read_gaussian_out does not parse vibrational frequencies)"
-        )
-    else:
-        lines.append(
-            "[MISSING] cclib — required by gaussian_freq.py for thermochem "
-            "parsing. Install with: pip install cclib"
-        )
-
     # Analysis stack
     if mda_version:
         lines.append(f"[OK] MDAnalysis {mda_version}")
@@ -421,12 +412,8 @@ def main() -> int:
             )
         if g16_bin or g09_bin:
             gauss_label = "g16" if g16_bin else "g09"
-            freq_label = (
-                "SP/Opt/Freq+thermochem" if cclib_version
-                else "SP/Opt (Freq needs cclib)"
-            )
             capabilities.append(
-                f"Gaussian DFT {freq_label} via {gauss_label}"
+                f"Gaussian DFT SP/Opt/Freq+thermochem via {gauss_label}"
             )
 
     if capabilities:

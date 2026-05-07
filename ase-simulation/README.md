@@ -44,9 +44,8 @@ conda install -c conda-forge ambertools   # or follow https://ambermd.org/GetAmb
 ```bash
 # Gaussian is license-gated; install per https://gaussian.com/
 # Source the env so g16 (or g09) is on PATH and GAUSS_EXEDIR / GAUSS_SCRDIR are set.
-
-# cclib is required for gaussian_freq.py thermochem parsing:
-pip install cclib
+# No third-party parser needed — thermochem parsing is in-house
+# (scripts/_gaussian_log.py, stdlib-only).
 ```
 
 `tblite` provides GFN1-xTB and GFN2-xTB. For GFN0 / GFN-FF you also need the
@@ -81,7 +80,8 @@ python ase-simulation/scripts/check_env.py
 - **DFT calculations via Gaussian** (v1.4+): single-point E/F/dipole
   (`scripts/gaussian_sp.py`), geometry optimization via
   `GaussianOptimizer` (`scripts/gaussian_opt.py`), frequency +
-  thermochemistry (`scripts/gaussian_freq.py`, parsed via cclib).
+  thermochemistry (`scripts/gaussian_freq.py`, parsed by an in-house
+  regex helper — no third-party parser).
   No method/basis defaults — the scripts require explicit
   `--method`, `--basis`, `--charge`, `--mult`, `--mem`, `--nproc`.
   SMD as the documented water-solvent default. **Goes through ASE's
@@ -136,9 +136,10 @@ ase-simulation/
 │   ├── validate_ml_md.py        # post-hoc cross-validation of MACE trajectories vs GFN2-xTB
 │   ├── parameterize_gaff2.py    # antechamber AM1-BCC -> parmchk2 -> tleap -> .prmtop/.rst7
 │   ├── run_amber.py             # Amber MD: min/heat/density/prod via pmemd.cuda/pmemd/sander
-│   ├── gaussian_sp.py           # DFT SP via ase.calculators.gaussian.Gaussian; cclib for charges/MO
+│   ├── gaussian_sp.py           # DFT SP via ase.calculators.gaussian.Gaussian; in-house parser for charges/MO
 │   ├── gaussian_opt.py          # DFT Opt via GaussianOptimizer (Gaussian L103)
-│   └── gaussian_freq.py         # DFT Freq + thermochem via cclib parse
+│   ├── gaussian_freq.py         # DFT Freq + thermochem via in-house log parser
+│   └── _gaussian_log.py         # in-house regex parser for Gaussian .log fields ASE doesn't cover
 └── evals/
     └── evals.json        # 5 realistic prompts, no automated assertions yet
 ```
@@ -155,10 +156,10 @@ ase-simulation/
   (see `references/amber.md` §1, §7).
 - **Gaussian extended scope (v3+)**: transition-state searches
   (`Opt=TS`, QST2/QST3) with IRC verification, anharmonic frequencies,
-  NBO/NPA via cclib's NBO parser dep, post-HF (CCSD/MP2/CASSCF),
-  excited states (TDDFT/CIS/EOM-CCSD). v1.4 ships SP / Opt / Freq /
-  SMD; the rest is documented as out-of-scope in
-  `references/gaussian.md` §7.
+  NBO/NPA (the NBO output format would need its own dedicated parser),
+  post-HF (CCSD/MP2/CASSCF), excited states (TDDFT/CIS/EOM-CCSD).
+  v1.4 ships SP / Opt / Freq / SMD; the rest is documented as
+  out-of-scope in `references/gaussian.md` §7.
 - **HPC submission helpers**: SLURM templates, queueing, restart logic.
 - **Free energy and enhanced sampling**: TI / FEP / MBAR, REMD,
   metadynamics, umbrella sampling. These are research workflows with

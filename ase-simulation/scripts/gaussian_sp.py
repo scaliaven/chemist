@@ -200,40 +200,35 @@ def main() -> int:
         print(f"[OK] dipole_e_A=[{d[0]:.4f},{d[1]:.4f},{d[2]:.4f}] "
               f"|d|={float(np.linalg.norm(d)):.4f}")
 
-    # Optional cclib parse for richer observables (charges, MO eigenvalues).
-    try:
-        import cclib
-        log_path = Path(f"{args.label}.log")
-        if log_path.exists():
-            data = cclib.io.ccopen(str(log_path)).parse()
-            mocoeffs_n = getattr(data, "nmo", None)
-            homos = getattr(data, "homos", None)
-            moenergies = getattr(data, "moenergies", None)
-            if homos is not None and moenergies is not None:
-                # moenergies is a list per spin; use spin 0
-                mo = moenergies[0]
-                ihomo = int(homos[0])
-                if 0 <= ihomo < len(mo) - 1:
-                    homo_eV = float(mo[ihomo])
-                    lumo_eV = float(mo[ihomo + 1])
-                    print(f"[OK] HOMO_eV={homo_eV:.4f}")
-                    print(f"[OK] LUMO_eV={lumo_eV:.4f}")
-                    print(f"[OK] HOMO_LUMO_gap_eV={lumo_eV - homo_eV:.4f}")
-            atomcharges = getattr(data, "atomcharges", None)
-            if atomcharges:
-                # atomcharges is a dict like {"mulliken": [...], ...}
-                for scheme, charges in atomcharges.items():
-                    sym = atoms.get_chemical_symbols()
-                    per_atom = ", ".join(
-                        f"{s}={c:+.3f}" for s, c in zip(sym, charges)
-                    )
-                    print(f"[OK] {scheme}_charges_e=[{per_atom}]")
-    except ImportError:
-        print("[INFO] cclib not installed; skipping richer observables. "
-              "Install with: pip install cclib")
-    except Exception as e:
-        print(f"[INFO] cclib parse failed ({type(e).__name__}: {e}); "
-              "energy/forces/dipole still valid above.")
+    # Richer observables via the in-house Gaussian log parser
+    # (no cclib dep — keeps everything through ASE-or-our-own-code).
+    log_path = Path(f"{args.label}.log")
+    if log_path.exists():
+        try:
+            from _gaussian_log import parse_mulliken_charges, parse_homo_lumo
+            charges = parse_mulliken_charges(log_path)
+            if charges is not None:
+                sym = atoms.get_chemical_symbols()
+                per_atom = ", ".join(
+                    f"{s}={c:+.3f}" for s, c in zip(sym, charges)
+                )
+                print(f"[OK] mulliken_charges_e=[{per_atom}]")
+            else:
+                print("[INFO] Mulliken charges not found in log "
+                      "(Gaussian default usually prints them; check the .log).")
+            hl = parse_homo_lumo(log_path)
+            if hl is not None:
+                homo_eV, lumo_eV = hl
+                print(f"[OK] HOMO_eV={homo_eV:.4f}")
+                print(f"[OK] LUMO_eV={lumo_eV:.4f}")
+                print(f"[OK] HOMO_LUMO_gap_eV={lumo_eV - homo_eV:.4f}")
+            else:
+                print("[INFO] MO eigenvalues not in log — Gaussian truncates "
+                      "default output for some methods. Add 'Pop=Reg' via "
+                      "--extra-route to force the full eigenvalue list.")
+        except Exception as e:
+            print(f"[INFO] log parse failed ({type(e).__name__}: {e}); "
+                  "energy/forces/dipole still valid above.")
 
     print(f"[SUMMARY] Gaussian {args.method}/{args.basis} single-point: "
           f"E = {energy:.4f} eV, fmax = {fmax:.3f} eV/Å"

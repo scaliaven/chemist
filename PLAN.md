@@ -30,15 +30,19 @@ work, so the v2.1/v2.2 diffs stay focused on real changes.
   density/prod**.
 
 ### `references/gaussian.md`
-- §3: caveat NPA charges — cclib's main attribute set does not include
-  NPA; the cclib NBO parser is a separate dep. Drop NPA from v2 scope;
-  the cclib NBO path is a v3 candidate.
+- §3: caveat NPA charges — drop NPA from v2 scope; NBO output has
+  its own format that would need its own parser; v3 candidate.
 - §3: add note that `ase.io.gaussian` does **not** parse vibrational
-  frequencies. Any Freq workflow must use cclib.
+  frequencies. The Freq workflow needs an in-house parser
+  (`_gaussian_log.py`, ships in v1.4).
 - §4: mark "solvation defaults" → **answered: SMD** (~3–5 kcal/mol RMSD
   improvement over IEF-PCM for aqueous solvation free energies).
-- §4: mark "cclib vs custom parser" → **answered: cclib** (v2 will
-  depend on cclib for Freq/thermochem regardless).
+- §4: mark "cclib vs custom parser" → **answered: in-house parser**.
+  The skill maintains an "everything through ASE-or-our-own-code"
+  framing; cclib is a third-party output parser layered on engines
+  ASE already wraps. The `_gaussian_log.py` helper is ~100 lines of
+  stdlib regex against Gaussian's stable .log format, with no extra
+  install cost.
 
 ### `references/ml_potentials.md`
 - §3: replace "MACE-MP-0 + CHGNet" with **"MACE-MP-0 (materials) +
@@ -224,9 +228,9 @@ Update PLAN.md as each lands or as data arrives.
 - **Gaussian extended scope (v3+)**: should `Opt=TS` / IRC / NBO+NPA /
   post-HF / TDDFT land? v1.4 deliberately ships SP/Opt/Freq/SMD only.
   Each extension has its own design problem (TS needs Hessian-guess +
-  IRC; NPA needs cclib NBO parser; post-HF needs basis-set/disk
-  heuristics). Decision criterion: usage data showing which extension
-  has the loudest demand.
+  IRC; NPA needs an NBO-output parser of its own; post-HF needs
+  basis-set/disk heuristics). Decision criterion: usage data showing
+  which extension has the loudest demand.
 - **Gaussian queue submission**: v1.4 runs locally only. SLURM
   templates may land in v2.5+; for now users wrap `gaussian_*.py` in
   their own queue script.

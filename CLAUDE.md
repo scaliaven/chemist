@@ -35,7 +35,8 @@ asechemist/
 │   │   ├── run_amber.py               # v1.3 — min/heat/density/prod via pmemd.cuda/pmemd/sander
 │   │   ├── gaussian_sp.py             # v1.4 — DFT SP via ase.calculators.gaussian.Gaussian
 │   │   ├── gaussian_opt.py            # v1.4 — DFT Opt via GaussianOptimizer (L103)
-│   │   └── gaussian_freq.py           # v1.4 — DFT Freq + thermochem via cclib parse
+│   │   ├── gaussian_freq.py           # v1.4 — DFT Freq + thermochem via in-house log parser
+│   │   └── _gaussian_log.py           # v1.4 — regex helper for Gaussian .log fields ASE doesn't cover
 │   ├── references/
 │   │   ├── ase_core.md, xtb.md, analysis.md           # v1 references
 │   │   ├── ml_potentials.md           # v1.2 reference — MACE method-selection + cross-validation contract
@@ -209,9 +210,11 @@ What v1.x ships today:
   `scripts/run_amber.py`.
 - **v1.4** — Gaussian DFT SP / Opt / Freq through `ase.calculators.
   gaussian.Gaussian`. No method/basis defaults; SMD as documented
-  water-solvent default; cclib required for Freq thermochem parsing.
+  water-solvent default; thermochem parsing via in-house
+  `scripts/_gaussian_log.py` helper (no third-party parser).
   `scripts/gaussian_sp.py`, `scripts/gaussian_opt.py`,
-  `scripts/gaussian_freq.py`. **Goes through ASE** — no carve-out.
+  `scripts/gaussian_freq.py`. **Goes through ASE** — no carve-out,
+  no cclib.
 
 What's deferred (do **not** add without raising scope first):
 
@@ -223,8 +226,9 @@ What's deferred (do **not** add without raising scope first):
   disulfide handling. v1.3 ships only GAFF2; do not adapt the v1.3
   `mdin` defaults for proteins.
 - **v3+** — Gaussian transition-state (`Opt=TS`, QST2/QST3, IRC),
-  anharmonic frequencies, NBO/NPA via cclib's NBO parser, post-HF
-  (CCSD/MP2/CASSCF), excited states (TDDFT/CIS/EOM-CCSD). v1.4 ships
+  anharmonic frequencies, NBO/NPA (NBO output has its own format
+  that needs its own parser), post-HF (CCSD/MP2/CASSCF), excited
+  states (TDDFT/CIS/EOM-CCSD). v1.4 ships
   SP/Opt/Freq/SMD; the rest is out of scope per
   `references/gaussian.md` §7.
 - **No v2 plan** — VASP, Quantum ESPRESSO (community CP2K / FHI-aims

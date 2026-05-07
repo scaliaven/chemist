@@ -3,22 +3,27 @@
 This file replaces the v2 stub. v1.4 ships:
 
 - `scripts/gaussian_sp.py` — DFT single-point energy + forces + dipole
-  via `ase.calculators.gaussian.Gaussian`. Optional cclib parse for
-  Mulliken/Löwdin/Hirshfeld charges and HOMO/LUMO eigenvalues.
+  via `ase.calculators.gaussian.Gaussian`. Mulliken charges and
+  HOMO/LUMO eigenvalues parsed by an in-house regex helper
+  (`scripts/_gaussian_log.py`).
 - `scripts/gaussian_opt.py` — DFT geometry optimization via
   `GaussianOptimizer` (delegates to Gaussian's L103 internal optimizer
   in one g16/g09 invocation, ~10–100× faster than wrapping ASE BFGS
   around per-step Gaussian SP calls).
 - `scripts/gaussian_freq.py` — DFT frequency + thermochemistry
-  (vib_freqs / ZPE / enthalpy / Gibbs G), parsed via **cclib**. ASE's
-  `read_gaussian_out` does not parse vibrational frequencies, so cclib
-  is a hard dependency for this script.
+  (vib_freqs / ZPE / enthalpy / Gibbs G), parsed by the in-house
+  `_gaussian_log.py` helper. **No cclib dependency.** ASE's
+  `read_gaussian_out` does not parse vibrational frequencies, so the
+  helper fills that gap with ~100 lines of regex against Gaussian's
+  format-stable output. Self-contained; no third-party parser needed.
 
 All three scripts run **through ASE** in the standard Calculator pattern
 (`atoms.calc = Gaussian(...)`, `atoms.get_potential_energy()` /
 `GaussianOptimizer(atoms, calc).run(...)`). The g16/g09 binary runs as
 a subprocess managed by ASE's `FileIOCalculator` machinery — same
-orchestration model as MACE, tblite, EMT, etc. **No carve-out.**
+orchestration model as MACE, tblite, EMT, etc. **No carve-out, no
+cclib.** The in-house `_gaussian_log.py` is a pure-regex helper, not
+an alternate calculator.
 
 ## §1. Method-selection rules
 
@@ -34,8 +39,10 @@ Apply in order. The first rule that fits is your answer.
    underperformed** → use Gaussian with a TM-appropriate functional
    (PBE0-D3(BJ) or TPSSh-D3 with def2-TZVP).
 4. **The user wants HOMO/LUMO at DFT level** rather than the raw xTB
-   eigenvalue gap → use `gaussian_sp.py` with cclib installed. cclib
-   parses MO eigenvalues from the .log; report eV directly.
+   eigenvalue gap → use `gaussian_sp.py`. The in-house `_gaussian_log.py`
+   helper parses MO eigenvalues from the .log and reports eV directly.
+   Add `Pop=Reg` via `--extra-route` if Gaussian truncates the default
+   eigenvalue list.
 5. **Otherwise stay on xTB.** Gaussian jobs cost minutes-to-hours;
    `single_point.py --calculator xtb` costs seconds. The skill should
    recommend Gaussian only when DFT is actually needed, not as a
@@ -112,30 +119,57 @@ Override with `--gaussian-binary {g16,g09}`. Practical differences:
   g09 route line into a g16-driven script (or vice versa), Gaussian
   errors out with a clear "unknown method" message rather than
   silently miscomputing.
-- cclib parses both versions for the v1.4 outputs (energies, dipoles,
-  vib_freqs, thermochem, Mulliken/Löwdin/Hirshfeld charges).
+- The in-house `_gaussian_log.py` parser handles both g16 and g09
+  output for the v1.4 fields (vib_freqs, thermochem, Mulliken charges,
+  MO eigenvalues). The format is stable across versions; if a future
+  Gaussian release breaks parsing, the helper file is small enough to
+  patch in place.
 
-## §6. cclib coverage and where it falls short
+## §6. Output parsing — the in-house helper
 
-`gaussian_sp.py` and `gaussian_opt.py` use ASE alone for E/F/dipole.
-`gaussian_freq.py` requires cclib because `ase.io.gaussian.
-read_gaussian_out` **does not parse vibrational frequencies** —
-checked in the ASE source. The `Freq` workflow has no in-house
-shortcut.
+`gaussian_sp.py` and `gaussian_opt.py` use ASE alone for E/F/dipole
+(`ase.io.gaussian.read_gaussian_out` is fine for those). For the
+fields ASE doesn't parse, v1.4 ships a small in-house helper:
 
-cclib's main attribute set covers:
+- `scripts/_gaussian_log.py` — ~100 lines of regex against Gaussian's
+  stable .log format. Three public functions:
 
-- `vibfreqs` (cm⁻¹), `vibirs`, `vibsyms` — vibrational analysis.
-- `enthalpy`, `freeenergy`, `zpve`, `temperature` — thermochem.
-- `homos`, `moenergies` — MO eigenvalues.
-- `atomcharges` (a dict like `{"mulliken": [...], "lowdin": [...],
-  "hirshfeld": [...]}`) — partial charges.
+  - `parse_thermochem(log_path)` — vibrational frequencies (cm⁻¹,
+    signed; negative values are imaginary modes), ZPE, enthalpy,
+    Gibbs free energy, thermochem temperature. Returns a dict;
+    keys absent if the corresponding line wasn't in the log.
+  - `parse_mulliken_charges(log_path)` — list of per-atom Mulliken
+    charges from the most recent `Mulliken charges:` block (Gaussian
+    prints these by default), or None if not found.
+  - `parse_homo_lumo(log_path)` — `(HOMO_eV, LUMO_eV)` from the
+    `Alpha occ./virt. eigenvalues` lines, or None. Gaussian
+    truncates default eigenvalue output for some methods; pass
+    `Pop=Reg` via `--extra-route` to force the full list.
 
-cclib **does not** expose **NPA** charges as a first-class attribute.
-NPA requires Gaussian's `Pop=NPA` (which calls NBO) plus cclib's NBO
-parser, which is a separate dep. v1.4 drops NPA from scope; if a user
-asks for NPA, recommend running it manually via the standalone NBO
-program. v3 may add the NBO parser dep.
+Why in-house instead of cclib:
+
+- **Architectural coherence.** The skill maintains an "everything
+  through ASE-or-our-own-code" framing. cclib is a third-party
+  output parser that wraps the same engines ASE already does;
+  layering it on top adds another vendor surface to track.
+- **Smaller install footprint.** `pip install cclib` pulls in
+  numpy + scipy + a wide compatibility matrix. The in-house helper
+  is stdlib-only (regex + pathlib).
+- **Maintenance burden is small.** Gaussian's Freq output format has
+  been stable across 09 → 16; the parser file is short enough to
+  patch in place if a future release breaks it.
+
+What's intentionally **not** parsed:
+
+- **NPA charges.** Require Gaussian's `Pop=NPA` (which calls NBO);
+  NBO has a different output format that's not worth a parser for
+  v1.4. Recommend running NBO manually if a user asks. v3 candidate.
+- **Löwdin / Hirshfeld charges.** Same reasoning — Mulliken is
+  default Gaussian output; the others require explicit `Pop=`
+  flags and have less consistent output blocks. Add only if usage
+  data demands them.
+- **Higher-derivative properties** (polarizabilities, hyperpolar-
+  izabilities, IR/Raman intensities). Out of scope for v1.4.
 
 ## §7. Out of scope (v1.4)
 
@@ -147,8 +181,9 @@ These are not in v1.4 and are intentionally not blocking issues:
   runs it" pattern. Push to v3+.
 - **Anharmonic frequencies** (`Freq=Anharmonic`). Expensive and needs
   careful normal-mode follow-up.
-- **NBO analysis** (`Pop=NBO`) and **NPA charges**. cclib's NBO parser
-  is a separate dep; v3 candidate.
+- **NBO analysis** (`Pop=NBO`) and **NPA charges**. NBO output has
+  a different format that's not worth a parser for v1.4; v3
+  candidate.
 - **Post-Hartree-Fock correlated methods** (CCSD, CCSD(T), MP2,
   CASSCF). Method-specific basis-set / memory / disk heuristics.
 - **Excited-state methods** (TDDFT, CIS, EOM-CCSD).
@@ -181,9 +216,10 @@ These are not in v1.4 and are intentionally not blocking issues:
   a g09-specific keyword on g16 (or vice versa). Check the .com file
   written by ASE under `<label>.com`; route line is on the line
   starting with `#P`.
-- **Job runs but cclib parse fails** — usually means Gaussian errored
-  partway. Look at `<label>.log` for `Error termination`. cclib
-  doesn't report what's missing; you have to read the log.
+- **Job runs but the parser returns empty / None** — usually means
+  Gaussian errored partway. Look at `<label>.log` for `Error
+  termination`. The in-house parser fails silently rather than
+  raising, so you have to inspect the log directly.
 - **Out of disk** — Gaussian scratch fills up. Set `GAUSS_SCRDIR` to
   a fast, large-quota path before the run.
 - **`%mem` insufficient** — Gaussian writes "Out-of-memory error in
