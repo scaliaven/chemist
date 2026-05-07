@@ -36,13 +36,35 @@ from pathlib import Path
 
 
 def build_calculator(name: str, *, xtb_method: str = "GFN2-xTB",
-                     charge: int = 0, multiplicity: int = 1):
+                     charge: int = 0, multiplicity: int = 1,
+                     lj_epsilon: float | None = None,
+                     lj_sigma: float | None = None,
+                     lj_rc: float | None = None):
     if name == "emt":
         from ase.calculators.emt import EMT
         return EMT()
     if name == "lj":
         from ase.calculators.lj import LennardJones
-        return LennardJones()
+        kwargs = {}
+        if lj_epsilon is not None:
+            kwargs["epsilon"] = lj_epsilon
+        if lj_sigma is not None:
+            kwargs["sigma"] = lj_sigma
+        if lj_rc is not None:
+            kwargs["rc"] = lj_rc
+        elif lj_sigma is not None:
+            kwargs["rc"] = 3.0 * lj_sigma
+        if kwargs:
+            eps_s = f"{kwargs.get('epsilon', 1.0):.4g} eV"
+            sig_s = f"{kwargs.get('sigma', 1.0):.4g} Å"
+            rc_s = (f"{kwargs['rc']:.4g} Å" if "rc" in kwargs
+                    else "ASE default")
+            print(f"[lj] ε={eps_s}  σ={sig_s}  rc={rc_s}")
+        else:
+            print("[lj] reduced units (ε=1, σ=1) — toy parameters; "
+                  "for real noble gases pass --epsilon/--sigma "
+                  "(see references/ase_core.md §LJ parameters)")
+        return LennardJones(**kwargs)
     if name == "tip3p":
         from ase.calculators.tip3p import TIP3P
         return TIP3P()
@@ -81,6 +103,16 @@ def main() -> int:
                    choices=["GFN1-xTB", "GFN2-xTB"])
     p.add_argument("--charge", type=int, default=0)
     p.add_argument("--multiplicity", type=int, default=1)
+    p.add_argument("--epsilon", type=float, default=None,
+                   help="LJ ε in eV (default: ASE reduced units, ε=1). "
+                        "For real noble gases see references/ase_core.md "
+                        "§LJ parameters.")
+    p.add_argument("--sigma", type=float, default=None,
+                   help="LJ σ in Å (default: ASE reduced units, σ=1).")
+    p.add_argument("--rc", type=float, default=None,
+                   help="LJ cutoff in Å (default: 3*sigma if --sigma is "
+                        "given, else ASE default). Must be < L/2 in "
+                        "periodic systems.")
     p.add_argument("--ensemble", default="nvt-langevin",
                    choices=["nve", "nvt-langevin", "nvt-nose-hoover"])
     p.add_argument("--temperature", type=float, default=300.0,
@@ -119,6 +151,7 @@ def main() -> int:
     atoms.calc = build_calculator(
         args.calculator, xtb_method=args.xtb_method,
         charge=args.charge, multiplicity=args.multiplicity,
+        lj_epsilon=args.epsilon, lj_sigma=args.sigma, lj_rc=args.rc,
     )
 
     if not args.no_init_velocities:

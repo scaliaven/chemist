@@ -13,6 +13,8 @@ trajectories, or scaffold an NEB.
 6. [Trajectory format](#trajectory-format)
 7. [Vibrations](#vibrations)
 8. [NEB scaffolding](#neb-scaffolding)
+9. [Water (TIP3P + FixBondLengths)](#water-tip3p--fixbondlengths)
+10. [LJ parameters for real noble gases](#lj-parameters-for-real-noble-gases)
 
 ## Imports and units
 
@@ -253,6 +255,91 @@ opt.run(fmax=0.05)
 
 Use `climb=True` to converge the saddle point precisely (CI-NEB). Each image
 needs an **independent** calculator instance — sharing one corrupts forces.
+
+## Water (TIP3P + FixBondLengths)
+
+TIP3P is a **rigid-body** water model: the O–H bond length and H–O–H angle
+are fixed by parameterization, not by potential terms. ASE's `TIP3P()`
+calculator computes Coulomb + Lennard-Jones contributions but does **not**
+constrain the geometry on its own. If you let the bonds flex, the Coulomb
+term over-attracts and the water molecules collapse within a few hundred
+fs. You must attach `ase.constraints.FixBondLengths` for both O–H bonds
+and the H–H "bond" (the third constraint pins the angle) on every water.
+
+```python
+from ase.calculators.tip3p import TIP3P
+from ase.constraints import FixBondLengths
+
+# `atoms` is a box of N water molecules, ordered (O, H, H, O, H, H, ...)
+n_waters = len(atoms) // 3
+pairs = []
+for i in range(n_waters):
+    o, h1, h2 = 3 * i, 3 * i + 1, 3 * i + 2
+    pairs += [(o, h1), (o, h2), (h1, h2)]
+atoms.set_constraint(FixBondLengths(pairs))
+atoms.calc = TIP3P()
+# now safe to run optimize / MD
+```
+
+Notes:
+- **Atom ordering matters.** The (O, H, H) triplet pattern above is what
+  `ase.build.molecule("H2O")` produces and what TIP3P assumes. If your
+  input is a PDB or arbitrary XYZ, check `atoms.get_chemical_symbols()`
+  before assuming the pattern.
+- **Combine with `ase.md.langevin.Langevin` for NVT**, default 1 fs
+  timestep. Constrained MD with the bundled `scripts/run_md.py` will
+  honor whatever constraints are already on the `atoms` object — but the
+  script does **not** attach them itself, by design (water-detection in a
+  CLI is brittle).
+- For **one-off relaxations or single-points on small water clusters**,
+  GFN2-xTB is simpler — no constraints to set up. See `xtb.md`.
+
+## LJ parameters for real noble gases
+
+ASE's `LennardJones()` defaults are **reduced units** — ε = 1 eV, σ = 1 Å —
+which are toy parameters, not physical. For any real noble-gas simulation
+pass `--epsilon` / `--sigma` (and `--rc`) to `scripts/optimize.py`,
+`scripts/run_md.py`, or `scripts/single_point.py`. Without them, the
+script prints a `[lj] reduced units (ε=1, σ=1) — toy parameters` warning
+on startup so you don't accidentally publish reduced-unit "results."
+
+Standard 12-6 LJ parameters for the lighter noble gases:
+
+| Species | ε (eV)   | σ (Å)  | ε/k_B (K) | Source                                        |
+|---------|----------|--------|-----------|-----------------------------------------------|
+| Ar      | 0.01032  | 3.405  | 119.8     | Rahman, *Phys. Rev.* **136**, A405 (1964)     |
+| Kr      | 0.01411  | 3.633  | 163.8     | Maitland & Smith compilation, *IJT* (1980s)   |
+| Xe      | 0.01997  | 3.961  | 231.7     | Maitland & Smith compilation, *IJT* (1980s)   |
+
+Values are good to ~5%. The Ar parameters are the bedrock Rahman 1964
+fit and are the right default for "liquid argon at 90 K" reproductions.
+Kr and Xe values come from Maitland-Smith-Rigby-Wakeham, *Intermolecular
+Forces*, OUP (1981) compilations as cited in textbook reviews; primary
+sources (transport-property fits, second-virial fits) give values that
+differ at the few-percent level — verify against your source of truth
+before publishing. ε/k_B is shown for cross-reference with statistical-
+mechanics textbooks that quote temperatures.
+
+**Cutoff rule.** The default `rc = 3 σ` is fine for cluster systems and
+non-periodic boxes. For periodic systems, ASE's LJ uses the minimum-image
+convention, which requires **`rc < L/2`** along every cell vector — pass
+`--rc` explicitly if `3 σ` exceeds half your shortest box side, otherwise
+forces will be discontinuous and energy conservation will fail.
+
+**Worked example — liquid Ar at 90 K, NVT, 20 ps:**
+
+```bash
+python scripts/run_md.py --structure ar108.xyz --calculator lj \
+    --epsilon 0.01032 --sigma 3.405 --rc 6.0 \
+    --ensemble nvt-langevin --temperature 90 --friction 0.01 \
+    --timestep 5.0 --n-steps 4000 \
+    --output ar_nvt.traj --logfile ar_nvt.log
+```
+
+5 fs is safe for argon (no light atoms, no high-frequency bonds);
+`rc = 6.0 Å` is well under L/2 for the 108-atom 3×3×3 fcc cell (a ≈ 5.26 Å,
+L = 15.78 Å, L/2 = 7.89 Å) and a bit under the textbook 3 σ ≈ 10.2 Å
+cutoff — the small box forces the truncation.
 
 ## Appendix: system-size scaling notes
 

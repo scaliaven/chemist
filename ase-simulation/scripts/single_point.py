@@ -64,6 +64,16 @@ def main() -> int:
                    help="Net charge (xtb only).")
     p.add_argument("--multiplicity", type=int, default=1,
                    help="Spin multiplicity 2S+1 (xtb only).")
+    p.add_argument("--epsilon", type=float, default=None,
+                   help="LJ ε in eV (default: ASE reduced units, ε=1). "
+                        "For real noble gases see references/ase_core.md "
+                        "§LJ parameters.")
+    p.add_argument("--sigma", type=float, default=None,
+                   help="LJ σ in Å (default: ASE reduced units, σ=1).")
+    p.add_argument("--rc", type=float, default=None,
+                   help="LJ cutoff in Å (default: 3*sigma if --sigma is "
+                        "given, else ASE default). Must be < L/2 in "
+                        "periodic systems.")
     p.add_argument("--frame", type=int, default=-1,
                    help="If structure is a trajectory, which frame.")
     args = p.parse_args()
@@ -80,7 +90,26 @@ def main() -> int:
         atoms.calc = EMT()
     elif args.calculator == "lj":
         from ase.calculators.lj import LennardJones
-        atoms.calc = LennardJones()
+        kwargs = {}
+        if args.epsilon is not None:
+            kwargs["epsilon"] = args.epsilon
+        if args.sigma is not None:
+            kwargs["sigma"] = args.sigma
+        if args.rc is not None:
+            kwargs["rc"] = args.rc
+        elif args.sigma is not None:
+            kwargs["rc"] = 3.0 * args.sigma
+        if kwargs:
+            eps_s = f"{kwargs.get('epsilon', 1.0):.4g} eV"
+            sig_s = f"{kwargs.get('sigma', 1.0):.4g} Å"
+            rc_s = (f"{kwargs['rc']:.4g} Å" if "rc" in kwargs
+                    else "ASE default")
+            print(f"[lj] ε={eps_s}  σ={sig_s}  rc={rc_s}")
+        else:
+            print("[lj] reduced units (ε=1, σ=1) — toy parameters; "
+                  "for real noble gases pass --epsilon/--sigma "
+                  "(see references/ase_core.md §LJ parameters)")
+        atoms.calc = LennardJones(**kwargs)
     elif args.calculator == "tip3p":
         from ase.calculators.tip3p import TIP3P
         atoms.calc = TIP3P()

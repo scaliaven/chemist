@@ -4,7 +4,7 @@ description: Use this skill whenever the user wants to run, set up, or analyze a
 license: MIT
 ---
 
-# ASE Simulation Skill (v1)
+# ASE Simulation Skill (v1.1)
 
 ## Always do this first
 
@@ -67,8 +67,21 @@ Apply the first rule that fits the system, in this order:
    Ni, Pd, Pt, plus H/C/N/O as adsorbates), prefer **EMT**. *Why:* it's
    free, instant, and the user probably wants a quick metallic-system
    answer.
-3. **If the system is pure water** (H₂O molecules only), prefer **TIP3P**.
-   *Why:* parameterized for exactly this case.
+3. **If the system is pure water** (H₂O molecules only), the choice
+   depends on the task:
+   - **Production MD** → **TIP3P**. *Why:* parameterized for exactly this
+     case. **Requires `ase.constraints.FixBondLengths`** to keep the rigid
+     O–H / H–H geometry — TIP3P is a rigid-body model and bare ASE will
+     let the bonds vibrate, blowing up the simulation. See
+     `references/ase_core.md` §Water (TIP3P + FixBondLengths). The
+     bundled scripts do **not** auto-attach this constraint; you must add
+     it inline before handing the script the structure, or write a short
+     inline driver that does.
+   - **One-off relaxations or quick energy / single-point checks** on
+     small water systems → **GFN2-xTB**. *Why:* simpler — no constraints
+     to set up — and small water clusters are well within xTB's accuracy
+     range. `scripts/optimize.py` and `scripts/single_point.py` work as
+     expected with `--calculator xtb`.
 4. **If the system has organic / main-group chemistry** (heteroatoms,
    non-EMT elements, organic functional groups, ionic bonding), use
    **tblite GFN2-xTB**. *Why:* EMT will silently give nonsense for
@@ -92,31 +105,164 @@ silently substitute a wrong-physics fallback**. EMT on an organic is the
 classic failure mode — it will return numbers that look fine and are
 meaningless.
 
+## Verification & clarification
+
+Two failure modes hurt this skill the most: (a) silently picking the wrong
+physics or wrong parameters, and (b) re-asking the user something that the
+prompt or the structure file already answers. Counter both with the rules
+below.
+
+### Clarify yourself first — only ask when you actually can't tell
+
+Before asking the user anything, exhaust what is already determined:
+
+- **Read the structure file.** Element list, atom count, periodicity,
+  whether it's a slab, charge/multiplicity if present — `ase.io.read` and
+  inspect. Don't ask "is this a metal?" if the file says `Pt`.
+- **Re-read the prompt for already-named specs.** "MD at 300 K for 10 ps"
+  has named the temperature, the duration, and (implicitly, by "at") an
+  NVT ensemble. Don't re-ask any of them.
+- **Run `check_env.py`** so you know which calculators are available before
+  recommending one.
+- **Apply the method-selection tree above** to derive a defensible default
+  from system + task. If the rules give a unique answer, that's your
+  answer — don't ask the user to choose.
+
+When the answer is still genuinely underdetermined after all of that, *then*
+ask. Frame the question with the option you'd pick and the reason — e.g.,
+"GFN2-xTB looks right here because the system has heteroatoms; want me to
+fall back to GFN1 for d-block robustness instead?" — beats a blank "which
+method?".
+
+### Ask the user to verify before recommending execution
+
+After choosing parameters, restate them in a short block and ask the user to
+confirm before suggesting they run anything. The minimum to surface:
+
+- Calculator (and GFN level if applicable)
+- Optimizer / ensemble
+- For MD: temperature, friction, timestep, n_steps
+- For optimization: fmax, max_steps
+- Output paths that will be written
+
+Keep it tight — a 4–6 line summary, not a paragraph. If the user has
+already explicitly approved the plan in this conversation, don't re-ask.
+The point is to catch wrong-physics and wrong-parameter mistakes (EMT on
+an organic, 2 fs timestep with unconstrained H) before they cost the user
+wall-clock time, not to gate every interaction.
+
 ## Scripts — when to invoke each
 
 All scripts live in `scripts/` and are parameterized via argparse.
-Run with `--help` to see options. Reach for the script unless the user
-needs custom logic; otherwise write inline ASE code (which is fine — ASE
-is concise).
+Run with `--help` to see options.
 
-- **`scripts/check_env.py`** — Run at the start of any non-trivial task.
-  Reports installed backends and a one-line capability summary.
-- **`scripts/optimize.py`** — Geometry optimization with BFGS or FIRE.
-  Logs convergence; saves optimized structure and trajectory.
-- **`scripts/run_md.py`** — Parameterized MD driver. Calculator (emt / lj /
-  tip3p / xtb), ensemble (nve / nvt-langevin / nvt-nose-hoover), T, dt,
-  n_steps. Sensible defaults for organic molecules (1 fs, 300 K, friction
-  0.01/fs for Langevin, log every 100 steps).
+**Default — call the script.** When a bundled script's purpose matches
+the user's task, invoke the script with its CLI flags. Don't rewrite its
+logic inline. Bundled scripts have sane defaults, tested code paths,
+consistent CLI/output formats, and stay maintained as the skill evolves;
+inline code reinvents all of that and is harder for the user to re-run
+later with different parameters.
+
+**Carve-out — write inline.** Only when the task needs logic the scripts
+don't expose: a custom analysis function the user explicitly asked for,
+a non-standard ensemble (NPT, constrained dynamics), or a one-shot
+`ase.build` call that doesn't have a corresponding script. If the gap
+is narrow — a missing flag or an unexposed parameter — prefer **adding
+the flag to the script** and using it over a one-off inline rewrite.
+
+Per-script use:
+
+- **`scripts/check_env.py`** — Reports installed backends and a one-line
+  capability summary. **Use for:** the first thing you do on any
+  non-trivial task, so you recommend a method the environment actually
+  supports.
+- **`scripts/optimize.py`** — Geometry optimization with BFGS / FIRE /
+  LBFGS, calculator EMT / LJ / TIP3P / xTB. Real-gas LJ via
+  `--epsilon`/`--sigma`/`--rc`. **Use for:** any "minimize / relax /
+  optimize / find the equilibrium geometry" task on a single structure.
+- **`scripts/run_md.py`** — NVE / NVT-Langevin / NVT-Nose-Hoover MD with
+  EMT / LJ / TIP3P / xTB. Sensible defaults for organic molecules
+  (1 fs, 300 K, Langevin friction 0.01/fs, log every 100 steps). Real-gas
+  LJ via `--epsilon`/`--sigma`/`--rc`. **Use for:** any "run dynamics /
+  thermalize / equilibrate / produce a trajectory" task with standard
+  ensembles.
 - **`scripts/single_point.py`** — Single-point energy plus xTB electronic
-  observables (dipole, Mulliken charges, Wiberg bond orders, HOMO-LUMO).
-  Tagged key=value output. Optimize first, then run this — single-point
-  observables on a strained geometry are nonsense.
-- **`scripts/analyze_traj.py`** — RMSD, RMSF, energy drift, optional RDF.
-  Saves PNG plots and CSV data alongside the trajectory.
+  observables (dipole, Mulliken charges, Wiberg bond orders, HOMO-LUMO
+  raw eigenvalue gap). Tagged `key=value` output. Optimize first —
+  single-point observables on a strained geometry are nonsense. **Use
+  for:** any energy / force / electronic-observable request on a fixed
+  geometry, including binding-energy decomposition (run three times).
+- **`scripts/analyze_traj.py`** — RMSD, RMSF, energy drift, optional RDF
+  from a trajectory. Saves PNG plots and CSV data alongside the input.
+  **Use for:** any "analyze this trajectory / RMSD vs. frame 0 / check
+  energy drift / compute RDF" task. **These analyses ARE the script's
+  primary purpose, not a subset of it — do not write a substitute for
+  any of them inline.** The script handles edge cases (Kabsch
+  alignment, missing-calculator fallback for energy drift, periodic
+  unwrapping for RDF) that an inline rewrite will get wrong.
 
-When inline code is more honest, write inline code — for example, a 5-line
-single-point energy calculation or a one-shot `ase.build` does not need a
-script.
+### Growing the skill: when to offer to bundle new scripts
+
+The default chain is: bundled script when one matches → inline code when
+none does. Add a third option: when the inline code looks like recurring
+work, **offer to promote it to a new bundled script**.
+
+**Offer when ALL of these are true:**
+
+- The inline code is substantial — > ~30 lines, **or** it implements a
+  complete workflow with parameters worth exposing as CLI flags.
+- No existing script in `scripts/` covers the task type. (If one does,
+  point the user at it instead — don't make a duplicate.)
+- The user's request reads as recurring work — phrasing like "for each
+  molecule," "I'll run this on a bunch of systems," "every time I get a
+  new structure," or any other parametric framing.
+
+**Don't offer when:**
+
+- The inline code is trivial (< ~30 lines, single-purpose, e.g., a
+  small `ase.build` call).
+- The task is already covered by an existing script — point the user
+  there instead.
+- The request is one-shot exploratory ("what's the energy of this
+  molecule?") or conversational / definitional.
+
+**What the offer looks like.** End the response with a paragraph along
+these lines (adapt the specifics to the actual task):
+
+> I wrote this inline because no existing script in `scripts/` covers
+> [specific task]. If this is something you'll do repeatedly, I can
+> refactor it into `scripts/<name>.py` with proper argparse, a
+> docstring that explains when to reach for it, and a SKILL.md
+> §Scripts entry — and the next time you (or anyone using this skill)
+> hits the same task, the bundled script will be the default. Want me
+> to do that?
+
+**If the user says yes:**
+
+1. Refactor the inline code into `scripts/<descriptive_name>.py`. Use a
+   verb-based name following existing conventions (`optimize.py`,
+   `run_md.py`, `analyze_traj.py`).
+2. Add argparse with sensible defaults and useful `--help` text.
+3. Add a top-of-file docstring that explains **when** to reach for the
+   script — that's what helps future Claude sessions trigger it.
+4. Match output conventions of existing scripts (banner line on start,
+   tagged `[OK]` / `[INFO]` lines, plots/CSVs alongside the input,
+   meaningful exit codes).
+5. Add a one-line bullet to SKILL.md §Scripts in the same format as the
+   existing entries (`**Use for:** ...`).
+6. Run the new script with `--help` and one realistic example invocation
+   to verify it works. Report success or failure to the user.
+
+**If the user says no:** leave the inline code alone. Don't ask again
+in the same conversation.
+
+**Why this matters.** The skill grows by accretion of workflows that
+turn out to be recurring. Static curation can't anticipate every useful
+pattern. Asking the user is the cheapest, highest-signal way to find
+which inline patterns deserve promotion: every "yes" is direct evidence
+of a recurring need, every "no" is direct evidence the work was a
+one-off. Over time, `scripts/` becomes a frequency-weighted snapshot of
+what the skill is actually used for.
 
 ## References — read these on demand
 
