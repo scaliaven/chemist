@@ -1,10 +1,10 @@
 ---
 name: ase-simulation
-description: Use this skill whenever the user wants to run, set up, or analyze atomistic simulations on molecules or materials. This covers: molecular dynamics (MD, NVE, NVT, NPT, Langevin, Nose-Hoover) including thermalization, equilibration, and "warm up the system" requests; geometry optimization, energy minimization, or relaxation (BFGS, FIRE, LBFGS — "minimize this molecule", "relax this structure", "find the equilibrium geometry"); vibrational frequency, normal-mode, Hessian, and zero-point-energy analysis; NEB and transition-state searches; structure building (small molecules, bulk crystals, surfaces like fcc111, slabs with adsorbates); trajectory analysis (RMSD, RMSF, RDF, energy drift); single-point energy and force evaluation; binding, interaction, and adsorption energy calculations; and electronic observables like HOMO-LUMO gap, dipole moment, or Mulliken charges. Use this skill for any request involving force fields, semi-empirical methods (xTB / GFN1 / GFN2), foundation-model ML potentials (MACE-MP-0, MACE-OFF), DFT-style reasoning about which method to pick, or any computational chemistry / materials task that mentions ASE, EMT, Lennard-Jones, TIP3P, tblite, xtb, or MACE. Reach for this skill even when the user does not name ASE — phrases like "minimize this molecule", "relax this geometry", "thermalize at 300 K", "equilibrate the system", "compute the binding energy", "run MD on water", "build a Pt(111) slab", "compute frequencies", "speed up this MD with a foundation model", "use MACE", or "run a 5000-atom system" should all trigger this skill.
+description: Use this skill whenever the user wants to run, set up, or analyze atomistic simulations on molecules or materials. This covers: molecular dynamics (MD, NVE, NVT, NPT, Langevin, Nose-Hoover) including thermalization, equilibration, and "warm up the system" requests; geometry optimization, energy minimization, or relaxation (BFGS, FIRE, LBFGS — "minimize this molecule", "relax this structure", "find the equilibrium geometry"); vibrational frequency, normal-mode, Hessian, and zero-point-energy analysis; NEB and transition-state searches; structure building (small molecules, bulk crystals, surfaces like fcc111, slabs with adsorbates); trajectory analysis (RMSD, RMSF, RDF, energy drift); single-point energy and force evaluation; binding, interaction, and adsorption energy calculations; explicit-solvent small-molecule MD with GAFF2 + AM1-BCC charges via antechamber and pmemd; and electronic observables like HOMO-LUMO gap, dipole moment, or Mulliken charges. Use this skill for any request involving force fields (GAFF2, AM1-BCC, classical MM), semi-empirical methods (xTB / GFN1 / GFN2), foundation-model ML potentials (MACE-MP-0, MACE-OFF), DFT-style reasoning about which method to pick, or any computational chemistry / materials task that mentions ASE, EMT, Lennard-Jones, TIP3P, tblite, xtb, MACE, antechamber, tleap, sander, or pmemd. Reach for this skill even when the user does not name ASE — phrases like "minimize this molecule", "relax this geometry", "thermalize at 300 K", "equilibrate the system", "compute the binding energy", "run MD on water", "build a Pt(111) slab", "compute frequencies", "speed up this MD with a foundation model", "use MACE", "run a 5000-atom system", "ligand MD in water", "GAFF2 parameterization", "AM1-BCC charges", "explicit-solvent MD of this drug molecule", or "antechamber" should all trigger this skill.
 license: MIT
 ---
 
-# ASE Simulation Skill (v1.2)
+# ASE Simulation Skill (v1.3)
 
 ## Always do this first
 
@@ -64,6 +64,7 @@ and you should keep walking.
 |---|---|---|
 | Optimize / minimize / relax | `scripts/optimize.py` | FIRE for far-from-equilibrium, BFGS otherwise |
 | MD at temperature T | `scripts/run_md.py` | Langevin NVT is the default ensemble |
+| Production explicit-solvent MD on a small organic | `scripts/parameterize_gaff2.py` then `scripts/run_amber.py` | GAFF2 + AM1-BCC, TIP3P/OPC water, min/heat/density/prod via pmemd. See `references/amber.md` |
 | Vibrations / Hessian / ZPE | `ase.vibrations.Vibrations` inline | Optimize to fmax ≤ 0.01 first, or you get spurious imaginary modes |
 | HOMO-LUMO / dipole / charges | `scripts/single_point.py` (with `--calculator xtb`) | Returns gap, dipole, Mulliken charges, bond orders. **HOMO-LUMO is the raw eigenvalue gap — see `references/xtb.md` for the convention.** |
 | Binding / interaction / adsorption energy | three runs of `scripts/single_point.py` | E(complex) − E(A) − E(B); use the same calculator for all three |
@@ -100,6 +101,14 @@ Apply the first rule that fits the system, in this order:
    non-EMT elements, organic functional groups, ionic bonding), use
    **tblite GFN2-xTB**. *Why:* EMT will silently give nonsense for
    non-metals; GFN2-xTB is the cheapest method that knows real chemistry.
+   *Sub-rule: if the user wants production-length explicit-solvent MD
+   (≥ 100 ps in a TIP3P/OPC box) on a single small organic, switch to
+   **GAFF2 + AM1-BCC** via `scripts/parameterize_gaff2.py` →
+   `scripts/run_amber.py`. xTB MD with explicit solvent past ~100 ps
+   is impractical (the box pushes well past 1k atoms once water is
+   added); GAFF2 is the right tool for that task and the v1.3 scripts
+   handle the antechamber → tleap → pmemd pipeline. See
+   `references/amber.md` for force-field and water-model details.*
 5. **If the system is a transition-metal complex and GFN2 fails to
    converge**, fall back to **GFN1-xTB**. *Why:* GFN1 is more robust on
    d-block elements at the cost of some accuracy.
@@ -247,6 +256,24 @@ Per-script use:
   `run_md.py` runtime validation; writes `validation.csv`. **Use
   for:** trajectories produced with `--no-validate`, or to re-validate
   with a different reference / stride.
+- **`scripts/parameterize_gaff2.py`** — Drives `antechamber -c bcc`
+  (AM1-BCC charges) → `parmchk2` (frcmod) → `tleap` (solvate in
+  TIP3P or OPC, neutralize with Na+/Cl-) for a small organic
+  molecule. Output is the `.prmtop` / `.rst7` pair consumed by
+  `run_amber.py`. **Use for:** any "parameterize this ligand /
+  small molecule for explicit-solvent MD" task. **Mandatory:
+  `--net-charge` matches the formal charge** — getting it wrong
+  silently shifts every partial charge.
+- **`scripts/run_amber.py`** — Runs Amber MD on a `.prmtop` / `.rst7`
+  pair. `--protocol standard` runs min → heat (50 ps NVT, 0→300 K)
+  → density (100 ps NPT) → prod (default 500 ps NPT). Engine
+  selection auto-picks `pmemd.cuda` > `pmemd` > `sander`; override
+  with `--engine`. Outputs NetCDF `.nc` ready for
+  `analyze_traj.py`. **Use for:** any GAFF2 small-molecule MD task,
+  or BYO-prmtop runs where the topology was generated outside the
+  skill. **Note:** v1.3's `mdin` defaults are tuned for GAFF2
+  small molecules; protein/NA prmtop files will run but may want
+  different cutoffs / restraints.
 - **`scripts/single_point.py`** — Single-point energy plus xTB electronic
   observables (dipole, Mulliken charges, Wiberg bond orders, HOMO-LUMO
   raw eigenvalue gap). Tagged `key=value` output. Optimize first —
@@ -347,15 +374,20 @@ comes up; do not preload them all.
   MAE_F > 100 meV/Å abort), known MACE failure modes (liquid mixtures,
   the ~1–2k atom GPU ceiling, OOD geometries), GPU/CPU notes,
   troubleshooting (OOM, weight downloads).
+- **`references/amber.md`** — Read for: when GAFF2 wins over GFN2-xTB,
+  the antechamber → parmchk2 → tleap → pmemd pipeline, force-field
+  and water-model choices (GAFF2 vs GAFF, TIP3P vs OPC, AM1-BCC vs
+  RESP), engine selection (pmemd.cuda vs pmemd vs sander), known
+  failure modes (charge parity, antechamber aromatic perception, box
+  sizing), troubleshooting. Protein/NA MD via ff19SB+OPC / OL21 is
+  deferred to v2.3 — the `mdin` defaults in v1.3 are GAFF2-tuned.
 
-The following reference files are **stubs for v2** — they document
-intended scope and detection logic but are **not implementations**.
-Do not follow them as workflows. If a user asks about one of these
-backends, point at the stub for an honest description of the limit
-and pick a v1-supported alternative.
+The following reference file is a **stub for v2.4** — it documents
+intended scope and detection logic but is **not an implementation**.
+Do not follow it as a workflow. If a user asks about Gaussian, point
+at the stub for an honest description of the limit and pick a
+v1-supported alternative (GFN2-xTB for similar accuracy on organics).
 
-- `references/amber.md`         (stub — small-molecule GAFF2 path
-                                 lands in v2.2; protein/NA in v2.3)
 - `references/gaussian.md`      (stub — planned for v2.4)
 
 ## Defaults and conventions
@@ -389,8 +421,11 @@ When you finish a task, report:
 ## What v1 does NOT support
 
 Tell the user honestly when their request crosses the line:
-- Amber for protein / nucleic-acid MD — small-molecule GAFF2 lands
-  in v2.2; protein (ff19SB+OPC) and nucleic-acid (OL21) MD in v2.3.
+- Amber for protein / nucleic-acid MD — v1.3 ships GAFF2 small-molecule
+  MD only. Protein (ff19SB+OPC) and nucleic-acid (OL21) MD are deferred
+  to v2.3. Users with a `.prmtop` from their own workflow can still run
+  `run_amber.py` against it; `mdin` defaults are GAFF2-tuned but most
+  parameters are reasonable for biomolecules too — flag this honestly.
 - Gaussian (DFT) — planned for v2.4. If the user has g16/g09 on PATH,
   `check_env.py` will report it under `[v2 preview]`.
 - VASP, Quantum ESPRESSO — no v2 plan; community CP2K / FHI-aims
@@ -401,8 +436,8 @@ Tell the user honestly when their request crosses the line:
   slated to add CHGNet for charge-aware materials; today MACE-MP-0
   covers most of the same systems with the cross-validation contract
   documented in `references/ml_potentials.md`."
-- Free energy methods, enhanced sampling, metadynamics.
-- Implicit/explicit solvation models beyond TIP3P water clusters
-  (GAFF2 + TIP3P/OPC arrives in v2.2 for small molecules).
+- Free energy methods (TI / FEP / MBAR), enhanced sampling (REMD,
+  metadynamics, umbrella sampling), QM/MM, constant-pH MD.
+- RESP charges via Gaussian — v1.3 uses AM1-BCC only.
 - SLURM/HPC submission scripts.
 - Web GUI / visualization servers.

@@ -105,35 +105,6 @@ def _v2_preview_lines() -> list[str]:
         "supported by the skill)"
     )
 
-    # --- Amber ---
-    sander = shutil.which("sander")
-    pmemd = shutil.which("pmemd")
-    tleap = shutil.which("tleap")
-    amber_home = os.environ.get("AMBERHOME")
-    if sander or pmemd:
-        engine, path = ("sander", sander) if sander else ("pmemd", pmemd)
-        out.append(f"[v2 preview] Amber:    available ({engine} at {path})")
-        if not tleap:
-            out.append(
-                "[v2 preview]            note: tleap not on PATH — "
-                "v2 system prep will need it"
-            )
-        if not amber_home:
-            out.append(
-                "[v2 preview]            note: AMBERHOME unset — "
-                "environment may not be sourced"
-            )
-        out.append(
-            "[v2 preview]            → not yet supported by skill, "
-            "see references/amber.md"
-        )
-    else:
-        out.append("[v2 preview] Amber:    not detected")
-        out.append(
-            "[v2 preview]            → planned for v2, "
-            "see references/amber.md"
-        )
-
     # --- Gaussian ---
     g16 = shutil.which("g16")
     g09 = shutil.which("g09")
@@ -220,6 +191,15 @@ def main() -> int:
 
     xtb_binary = shutil.which("xtb")
     cuda = _detect_cuda()
+
+    # AmberTools / Amber binaries — promoted to supported in v1.3.
+    antechamber_bin = shutil.which("antechamber")
+    parmchk2_bin = shutil.which("parmchk2")
+    tleap_bin = shutil.which("tleap")
+    sander_bin = shutil.which("sander")
+    pmemd_bin = shutil.which("pmemd")
+    pmemd_cuda_bin = shutil.which("pmemd.cuda")
+    amber_home = os.environ.get("AMBERHOME")
 
     lines: list[str] = []
 
@@ -314,6 +294,47 @@ def main() -> int:
             "Install with: pip install torch"
         )
 
+    # AmberTools / Amber (v1.3 supports GAFF2 small-molecule MD; protein/NA
+    # MD via ff19SB+OPC / OL21 is deferred to v2.3).
+    if antechamber_bin and parmchk2_bin and tleap_bin:
+        lines.append(
+            f"[OK] AmberTools — antechamber, parmchk2, tleap all on PATH"
+        )
+    else:
+        missing_at = [
+            n for n, p in (
+                ("antechamber", antechamber_bin),
+                ("parmchk2", parmchk2_bin),
+                ("tleap", tleap_bin),
+            ) if p is None
+        ]
+        if missing_at:
+            lines.append(
+                f"[MISSING] AmberTools — {', '.join(missing_at)} not on PATH. "
+                "Install AmberTools (free): https://ambermd.org/GetAmber.php"
+            )
+
+    md_engines = []
+    if pmemd_cuda_bin:
+        md_engines.append(f"pmemd.cuda ({pmemd_cuda_bin})")
+    if pmemd_bin:
+        md_engines.append(f"pmemd ({pmemd_bin})")
+    if sander_bin:
+        md_engines.append(f"sander ({sander_bin})")
+    if md_engines:
+        lines.append("[OK] Amber MD engine(s): " + "; ".join(md_engines))
+    else:
+        lines.append(
+            "[MISSING] No Amber MD engine on PATH (need pmemd.cuda, pmemd, "
+            "or sander). AmberTools25 is fully open-source including pmemd.cuda."
+        )
+
+    if not amber_home and (antechamber_bin or sander_bin or pmemd_bin):
+        lines.append(
+            "[INFO] AMBERHOME unset — Amber binaries are on PATH but the "
+            "environment may not be fully sourced (some scripts depend on it)."
+        )
+
     # Analysis stack
     if mda_version:
         lines.append(f"[OK] MDAnalysis {mda_version}")
@@ -368,6 +389,18 @@ def main() -> int:
             capabilities.append(
                 f"MACE foundation-model MD with mandatory xTB cross-"
                 f"validation (on {device})"
+            )
+        if (antechamber_bin and parmchk2_bin and tleap_bin
+                and (sander_bin or pmemd_bin or pmemd_cuda_bin)):
+            engine_label = (
+                "pmemd.cuda" if pmemd_cuda_bin
+                else "pmemd" if pmemd_bin
+                else "sander"
+            )
+            capabilities.append(
+                f"GAFF2 small-molecule MD with AM1-BCC charges "
+                f"(antechamber + tleap + {engine_label}; protein/NA "
+                f"deferred to v2.3)"
             )
 
     if capabilities:
