@@ -58,6 +58,25 @@ run_one p2_relax_synonym trigger     "Can you relax the structure in test-inputs
 run_one p3_md_no_method  trigger     "Run 20 ps of NVT dynamics on liquid argon at 90 K. Starting config is in test-inputs/ar108.xyz. Write the script — don't execute the simulation."
 run_one p4_analyze_traj  trigger     "I've got a trajectory at test-inputs/md.traj from a previous run. Plot RMSD vs the first frame and check whether energy is drifting. Write the analysis script; don't execute it yet."
 run_one p5_build_struct  trigger     "Build a Pt(111) surface, 4 layers, 4x4, with a CO molecule on the top site. Save as POSCAR. Just write the script — don't run it."
+
+# v1.2 — MACE foundation models. Tests the trigger contract added in
+# SKILL.md description ("speed up MD with a foundation model", "MACE-OFF",
+# "run a 5000-atom system") and the method-selection rule that points
+# past the xTB cliff at MACE.
+run_one p10_mace_named   trigger     "Run NVT MD on test-inputs/caffeine.xyz at 300 K for 50 ps using MACE-OFF. Write the script; don't execute it."
+run_one p11_size_cliff   trigger     "I want to run molecular dynamics on a 5000-atom organic system. What's the right approach with the ase-simulation tools? Don't run anything; just walk me through method selection."
+
+# v1.3 — Amber GAFF2 small-molecule MD. Tests the antechamber / GAFF2 /
+# explicit-solvent triggers added in SKILL.md description and the new
+# Step 1 task-table entry pointing at parameterize_gaff2.py + run_amber.py.
+run_one p12_gaff2_named  trigger     "Run 1 ns of explicit-solvent MD on caffeine in TIP3P water using GAFF2. Starting structure: test-inputs/caffeine.xyz, net charge 0. Write the scripts; don't execute."
+run_one p13_antechamber  trigger     "Parameterize the molecule in test-inputs/caffeine.xyz with antechamber AM1-BCC charges (net charge 0) and GAFF2. Write the script; don't execute."
+
+# v1.3 borderline — protein MD is deferred to v2.3. Skill should still
+# trigger but explain the v1.3 limit honestly (BYO-prmtop with run_amber.py;
+# ff19SB+OPC support is v2.3 territory).
+run_one p14_protein_md   borderline  "I want to run MD on a protein in explicit solvent. How would you approach it with the ase-simulation tools? Don't run anything."
+
 run_one p6_general_know  no_trigger  "What's the boiling point of water at 1 atm in Celsius?"
 run_one p7_python_only   no_trigger  "Write a Python function that takes a list of dicts and groups them by a key."
 run_one p8_definitional  borderline  "Explain the difference between NVT and NPT ensembles."
