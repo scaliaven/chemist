@@ -219,6 +219,17 @@ Update PLAN.md as each lands or as data arrives.
   want production-length runs at scale, **and** there's appetite to
   invest in a wrapper, pick (4). Otherwise (1) holds — the carve-out
   is the tax for production speed without engineering work.
+
+  **Fifth option (taken in 2026-05):** keep the v1.3 carve-out as-is,
+  ship `amberchemist` as a sibling Amber-native skill alongside that
+  grows the deeper Amber surface (REMD, implicit-solvent, cpptraj-
+  driven analysis, MMPBSA scoring, ff19SB/OL21 in v1.1). The carve-
+  out then handles "GAFF2 + plain NPT MD inside an ASE workflow"
+  prompts; `amberchemist` handles "run Amber natively." Routing
+  falls out of the trigger-phrase split (Amber-deep phrases reach
+  `amberchemist`; ASE-shaped phrases reach this skill). v1.0 of
+  `amberchemist` ships in `amberchemist/` next to `ase-simulation/`
+  and inherits the three-copy mirror rule.
 - **ML**: molecules-vs-materials audience balance; system-size
   distribution; whether mandatory cross-validation overhead is
   acceptable; GPU prevalence among skill users.
