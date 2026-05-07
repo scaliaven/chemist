@@ -31,12 +31,26 @@ import time
 from pathlib import Path
 
 
-def build_calculator(name: str, *, xtb_method: str = "GFN2-xTB",
+def build_calculator(name: str, *, atoms=None, xtb_method: str = "GFN2-xTB",
                      charge: int = 0, multiplicity: int = 1,
                      lj_epsilon: float | None = None,
                      lj_sigma: float | None = None,
-                     lj_rc: float | None = None):
+                     lj_rc: float | None = None,
+                     mace_system_class: str | None = None,
+                     mace_device: str | None = None,
+                     mace_size: str = "medium"):
     """Construct the requested calculator. Raise on missing dependency."""
+    if name == "mace":
+        if atoms is None:
+            raise SystemExit(
+                "build_calculator(name='mace') requires atoms= for "
+                "element-based routing."
+            )
+        from ml_calculator import make_ml_calc
+        return make_ml_calc(
+            atoms, system_class=mace_system_class,
+            device=mace_device, model_size=mace_size,
+        )
     if name == "emt":
         from ase.calculators.emt import EMT
         return EMT()
@@ -88,14 +102,16 @@ def main() -> int:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         epilog=(
             "Calculator choice: emt = EMT (Al/Cu/Ag/Au/Ni/Pd/Pt/H/C/N/O only), "
-            "lj = Lennard-Jones, tip3p = TIP3P water, xtb = tblite GFN1/GFN2-xTB."
+            "lj = Lennard-Jones, tip3p = TIP3P water, xtb = tblite GFN1/GFN2-xTB, "
+            "mace = MACE-MP-0 / MACE-OFF (auto-routed)."
         ),
     )
     p.add_argument("--structure", required=True,
                    help="Path to input structure (xyz, cif, pdb, traj, ...).")
     p.add_argument("--calculator", required=True,
-                   choices=["emt", "lj", "tip3p", "xtb"],
-                   help="Energy/force backend.")
+                   choices=["emt", "lj", "tip3p", "xtb", "mace"],
+                   help="Energy/force backend. mace = MACE-MP-0 / MACE-OFF "
+                        "foundation model (auto-routed by element set).")
     p.add_argument("--xtb-method", default="GFN2-xTB",
                    choices=["GFN1-xTB", "GFN2-xTB"],
                    help="Only used if --calculator=xtb.")
@@ -113,6 +129,17 @@ def main() -> int:
                    help="LJ cutoff in Å (default: 3*sigma if --sigma is "
                         "given, else ASE default). Must be < L/2 in "
                         "periodic systems.")
+    p.add_argument("--mace-system-class", default=None,
+                   choices=["organic", "materials"],
+                   help="Override MACE auto-routing. Default: route by "
+                        "element set (organic if all elements in "
+                        "H/C/N/O/P/S/F/Cl/Br/I, else materials).")
+    p.add_argument("--mace-device", default=None,
+                   choices=["cuda", "cpu"],
+                   help="Inference device for MACE. Default: auto-detect.")
+    p.add_argument("--mace-size", default="medium",
+                   choices=["small", "medium", "large"],
+                   help="MACE foundation-model checkpoint size.")
     p.add_argument("--optimizer", default="bfgs",
                    choices=["bfgs", "fire", "lbfgs"],
                    help="bfgs = near-equilibrium, fire = far-from-equilibrium.")
@@ -135,9 +162,11 @@ def main() -> int:
     atoms = read(args.structure)
     print(f"Loaded {len(atoms)} atoms from {args.structure}")
     atoms.calc = build_calculator(
-        args.calculator, xtb_method=args.xtb_method,
+        args.calculator, atoms=atoms, xtb_method=args.xtb_method,
         charge=args.charge, multiplicity=args.multiplicity,
         lj_epsilon=args.epsilon, lj_sigma=args.sigma, lj_rc=args.rc,
+        mace_system_class=args.mace_system_class,
+        mace_device=args.mace_device, mace_size=args.mace_size,
     )
 
     if args.optimizer == "bfgs":

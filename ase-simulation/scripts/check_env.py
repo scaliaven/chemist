@@ -51,6 +51,45 @@ def _probe_tblite_ase() -> Optional[str]:
     return None
 
 
+def _detect_cuda() -> dict:
+    """Detect CUDA availability via torch. Used for ML-potential sizing.
+
+    Returns dict with keys:
+      torch_present : bool
+      available     : bool
+      n_devices     : int (when available)
+      primary_device: str (when available)
+      free_gb       : float (when available)
+      total_gb      : float (when available)
+    """
+    try:
+        import torch
+    except ImportError:
+        return {"torch_present": False, "available": False}
+    if not torch.cuda.is_available():
+        return {"torch_present": True, "available": False}
+    try:
+        free, total = torch.cuda.mem_get_info(0)
+        return {
+            "torch_present": True,
+            "available": True,
+            "n_devices": torch.cuda.device_count(),
+            "primary_device": torch.cuda.get_device_name(0),
+            "free_gb": free / (1024 ** 3),
+            "total_gb": total / (1024 ** 3),
+        }
+    except Exception:
+        # mem_get_info can fail on older torch / unusual drivers
+        return {
+            "torch_present": True,
+            "available": True,
+            "n_devices": torch.cuda.device_count(),
+            "primary_device": torch.cuda.get_device_name(0),
+            "free_gb": float("nan"),
+            "total_gb": float("nan"),
+        }
+
+
 def _v2_preview_lines() -> list[str]:
     """Detection block for v2 backends (Amber, Gaussian, ML potentials).
 
@@ -124,9 +163,9 @@ def _v2_preview_lines() -> list[str]:
             "see references/gaussian.md"
         )
 
-    # --- ML potentials ---
+    # --- Other ML potentials (MACE has been promoted to a supported
+    #     backend; CHGNet, M3GNet, SevenNet, Orb remain v2-preview).
     ml_packages = [
-        ("MACE",     "mace_torch"),
         ("CHGNet",   "chgnet"),
         ("M3GNet",   "matgl"),
         ("SevenNet", "sevenn"),
@@ -149,8 +188,8 @@ def _v2_preview_lines() -> list[str]:
         )
     else:
         out.append(
-            "[v2 preview]            → ML potentials planned for v2, "
-            "see references/ml_potentials.md"
+            "[v2 preview]            → other ML potentials planned for "
+            "v2.2+, see references/ml_potentials.md"
         )
 
     return out
@@ -176,8 +215,11 @@ def main() -> int:
     mda_version = _try_import("MDAnalysis")
     matplotlib_version = _try_import("matplotlib")
     numpy_version = _try_import("numpy")
+    mace_version = _try_import("mace")
+    torch_version = _try_import("torch")
 
     xtb_binary = shutil.which("xtb")
+    cuda = _detect_cuda()
 
     lines: list[str] = []
 
@@ -240,6 +282,38 @@ def main() -> int:
             "Install with: conda install -c conda-forge xtb"
         )
 
+    # MACE foundation models
+    if mace_version:
+        lines.append(
+            f"[OK] mace {mace_version} — MACE-MP-0 (materials) and "
+            "MACE-OFF (organics) foundation models"
+        )
+    else:
+        lines.append(
+            "[MISSING] mace — MACE foundation models for systems past the "
+            "xTB size cliff (~1k atoms). Install with: pip install mace-torch"
+        )
+
+    # CUDA / GPU
+    if cuda["available"]:
+        free_str = (f"{cuda['free_gb']:.1f}/{cuda['total_gb']:.1f} GB free"
+                    if cuda["free_gb"] == cuda["free_gb"]  # NaN check
+                    else "memory unknown")
+        lines.append(
+            f"[OK] CUDA available — {cuda['n_devices']} device(s); "
+            f"GPU 0: {cuda['primary_device']} ({free_str})"
+        )
+    elif cuda["torch_present"]:
+        lines.append(
+            "[INFO] torch present but CUDA unavailable — MACE will run on CPU "
+            "(~10x slower; size cliff effectively halves)"
+        )
+    else:
+        lines.append(
+            "[MISSING] torch — required by mace-torch. "
+            "Install with: pip install torch"
+        )
+
     # Analysis stack
     if mda_version:
         lines.append(f"[OK] MDAnalysis {mda_version}")
@@ -267,6 +341,9 @@ def main() -> int:
         if tblite_works:
             opt_calcs.append("xTB")
             md_calcs.append("xTB")
+        if mace_version:
+            opt_calcs.append("MACE")
+            md_calcs.append("MACE")
         capabilities.append(
             f"geometry optimization with {'/'.join(opt_calcs)}"
         )
@@ -286,6 +363,12 @@ def main() -> int:
             capabilities.append("GFN-FF / GFN0 via xtb binary")
         if mda_version:
             capabilities.append("protein-trajectory analysis (MDAnalysis)")
+        if mace_version and tblite_works:
+            device = "GPU" if cuda["available"] else "CPU"
+            capabilities.append(
+                f"MACE foundation-model MD with mandatory xTB cross-"
+                f"validation (on {device})"
+            )
 
     if capabilities:
         summary = "You can currently run: " + "; ".join(capabilities) + "."

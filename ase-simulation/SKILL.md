@@ -1,10 +1,10 @@
 ---
 name: ase-simulation
-description: Use this skill whenever the user wants to run, set up, or analyze atomistic simulations on molecules or materials. This covers: molecular dynamics (MD, NVE, NVT, NPT, Langevin, Nose-Hoover) including thermalization, equilibration, and "warm up the system" requests; geometry optimization, energy minimization, or relaxation (BFGS, FIRE, LBFGS — "minimize this molecule", "relax this structure", "find the equilibrium geometry"); vibrational frequency, normal-mode, Hessian, and zero-point-energy analysis; NEB and transition-state searches; structure building (small molecules, bulk crystals, surfaces like fcc111, slabs with adsorbates); trajectory analysis (RMSD, RMSF, RDF, energy drift); single-point energy and force evaluation; binding, interaction, and adsorption energy calculations; and electronic observables like HOMO-LUMO gap, dipole moment, or Mulliken charges. Use this skill for any request involving force fields, semi-empirical methods (xTB / GFN1 / GFN2), DFT-style reasoning about which method to pick, or any computational chemistry / materials task that mentions ASE, EMT, Lennard-Jones, TIP3P, tblite, or xtb. Reach for this skill even when the user does not name ASE — phrases like "minimize this molecule", "relax this geometry", "thermalize at 300 K", "equilibrate the system", "compute the binding energy", "run MD on water", "build a Pt(111) slab", and "compute frequencies" should all trigger this skill.
+description: Use this skill whenever the user wants to run, set up, or analyze atomistic simulations on molecules or materials. This covers: molecular dynamics (MD, NVE, NVT, NPT, Langevin, Nose-Hoover) including thermalization, equilibration, and "warm up the system" requests; geometry optimization, energy minimization, or relaxation (BFGS, FIRE, LBFGS — "minimize this molecule", "relax this structure", "find the equilibrium geometry"); vibrational frequency, normal-mode, Hessian, and zero-point-energy analysis; NEB and transition-state searches; structure building (small molecules, bulk crystals, surfaces like fcc111, slabs with adsorbates); trajectory analysis (RMSD, RMSF, RDF, energy drift); single-point energy and force evaluation; binding, interaction, and adsorption energy calculations; and electronic observables like HOMO-LUMO gap, dipole moment, or Mulliken charges. Use this skill for any request involving force fields, semi-empirical methods (xTB / GFN1 / GFN2), foundation-model ML potentials (MACE-MP-0, MACE-OFF), DFT-style reasoning about which method to pick, or any computational chemistry / materials task that mentions ASE, EMT, Lennard-Jones, TIP3P, tblite, xtb, or MACE. Reach for this skill even when the user does not name ASE — phrases like "minimize this molecule", "relax this geometry", "thermalize at 300 K", "equilibrate the system", "compute the binding energy", "run MD on water", "build a Pt(111) slab", "compute frequencies", "speed up this MD with a foundation model", "use MACE", or "run a 5000-atom system" should all trigger this skill.
 license: MIT
 ---
 
-# ASE Simulation Skill (v1.1)
+# ASE Simulation Skill (v1.2)
 
 ## Always do this first
 
@@ -32,11 +32,25 @@ conda install -c conda-forge ase tblite-python mdanalysis matplotlib
 pip install ase tblite mdanalysis matplotlib
 ```
 
+For MACE foundation-model support (v1.2+), install separately:
+
+```bash
+pip install mace-torch
+```
+
 `tblite` ships GFN1-xTB and GFN2-xTB and is the supported successor to the
 deprecated `xtb-python`. If `check_env.py` reports `[BROKEN] tblite ...
 C extension unloadable`, the pip wheel is libgfortran-incompatible — switch
 to `conda install -c conda-forge tblite-python`. The standalone `xtb`
 binary (Grimme group) adds GFN0 and GFN-FF if it's on PATH.
+
+`mace-torch` provides the **MACE-MP-0** (89-element materials/inorganic
+foundation model) and **MACE-OFF** (10-element organics foundation
+model) calculators. Together they cover the systems where GFN2-xTB
+runs out of speed (~1k+ atoms). MACE requires `torch`; CUDA is
+strongly recommended (CPU mode is ~10× slower and the practical size
+ceiling halves). `check_env.py` reports CUDA status and a soft size-
+cliff warning based on free VRAM.
 
 ## Method selection
 
@@ -89,13 +103,26 @@ Apply the first rule that fits the system, in this order:
 5. **If the system is a transition-metal complex and GFN2 fails to
    converge**, fall back to **GFN1-xTB**. *Why:* GFN1 is more robust on
    d-block elements at the cost of some accuracy.
-6. **If the system is large enough that the chosen method becomes
-   impractical** (rough cliffs: xTB MD past ~1k atoms, anything past
-   ~50k), say so out loud: "v1 can't deliver that — GFN2-xTB MD becomes
-   impractical past 1k atoms, and v1 has no classical force field for
-   organics. v2 will add Amber and ML potentials; for now we can do a
-   single-point or a short geometry optimization, but not production
-   MD." See `references/ase_core.md` §Appendix for the full size table.
+6. **If the system is past the xTB size cliff (~1k atoms or ~10 ps of
+   xTB MD), reach for a MACE foundation model.** *Why:* GFN2-xTB MD
+   stops being practical at ~1k atoms; MACE foundation models (MACE-OFF
+   for organics, MACE-MP-0 for crystals/materials) deliver roughly
+   DFT-quality energies and forces in that 1k–~2k atom range on a
+   40 GB GPU. Use `--calculator mace` in `optimize.py` /
+   `run_md.py`; routing is automatic by element set.
+   **Cross-validation against GFN2-xTB is on by default for MD** —
+   every 1 ps the script recomputes E and F on the latest frame
+   through xTB and aborts the run when MAE_F > 100 meV/Å. This is
+   the contract under which MACE is recommended at all; do not turn
+   it off (`--no-validate`) without a specific reason. Read
+   `references/ml_potentials.md` for the full method-selection rules
+   and known failure modes (liquid mixtures, OOD geometries).
+7. **If the system is past the MACE ceiling too** (>2k atoms on a
+   40 GB GPU, >~1k on CPU, or anything past ~50k atoms in v1), say
+   so out loud: "v1.2 caps at MACE-medium on a single GPU; v2.2 is
+   slated to add larger ML potentials (CHGNet, Orb) and v2.3 adds
+   Amber for biomolecular MD beyond GAFF2 small molecules." See
+   `references/ase_core.md` §Appendix for the full size table.
 
 ### Step 3 — confirm the calculator is installed
 
@@ -195,15 +222,31 @@ Per-script use:
   non-trivial task, so you recommend a method the environment actually
   supports.
 - **`scripts/optimize.py`** — Geometry optimization with BFGS / FIRE /
-  LBFGS, calculator EMT / LJ / TIP3P / xTB. Real-gas LJ via
-  `--epsilon`/`--sigma`/`--rc`. **Use for:** any "minimize / relax /
-  optimize / find the equilibrium geometry" task on a single structure.
+  LBFGS, calculator EMT / LJ / TIP3P / xTB / MACE. Real-gas LJ via
+  `--epsilon`/`--sigma`/`--rc`. MACE via `--calculator mace`
+  (auto-routed to MACE-OFF for pure organics, MACE-MP-0 otherwise).
+  **Use for:** any "minimize / relax / optimize / find the equilibrium
+  geometry" task on a single structure.
 - **`scripts/run_md.py`** — NVE / NVT-Langevin / NVT-Nose-Hoover MD with
-  EMT / LJ / TIP3P / xTB. Sensible defaults for organic molecules
+  EMT / LJ / TIP3P / xTB / MACE. Sensible defaults for organic molecules
   (1 fs, 300 K, Langevin friction 0.01/fs, log every 100 steps). Real-gas
-  LJ via `--epsilon`/`--sigma`/`--rc`. **Use for:** any "run dynamics /
-  thermalize / equilibrate / produce a trajectory" task with standard
-  ensembles.
+  LJ via `--epsilon`/`--sigma`/`--rc`. With `--calculator mace`,
+  cross-validation against GFN2-xTB runs automatically every 1 ps
+  (`--validate-every`); MD aborts if MAE_F > 100 meV/Å
+  (`--abort-mae-f`). Disable with `--no-validate` only for specific
+  reasons. **Use for:** any "run dynamics / thermalize / equilibrate /
+  produce a trajectory" task with standard ensembles.
+- **`scripts/ml_calculator.py`** — Helper module exposing
+  `make_ml_calc(atoms, system_class=, device=, model_size=)`. Imported
+  by `optimize.py` and `run_md.py` when `--calculator mace`. **Use
+  for:** the rare inline case that needs a MACE calculator outside
+  the bundled scripts. Run as `python scripts/ml_calculator.py
+  --structure mol.xyz` to print routing without loading weights.
+- **`scripts/validate_ml_md.py`** — Post-hoc cross-validation of a
+  saved MACE trajectory against GFN2-xTB. Same MAE_F threshold as
+  `run_md.py` runtime validation; writes `validation.csv`. **Use
+  for:** trajectories produced with `--no-validate`, or to re-validate
+  with a different reference / stride.
 - **`scripts/single_point.py`** — Single-point energy plus xTB electronic
   observables (dipole, Mulliken charges, Wiberg bond orders, HOMO-LUMO
   raw eigenvalue gap). Tagged `key=value` output. Optimize first —
@@ -299,6 +342,11 @@ comes up; do not preload them all.
   trajectory readers vs MDAnalysis, recipes for the analyses
   `analyze_traj.py` implements, common pitfalls (alignment, periodic
   unwrapping).
+- **`references/ml_potentials.md`** — Read for: when to reach for MACE
+  vs stay with xTB, the cross-validation contract (1 ps cadence,
+  MAE_F > 100 meV/Å abort), known MACE failure modes (liquid mixtures,
+  the ~1–2k atom GPU ceiling, OOD geometries), GPU/CPU notes,
+  troubleshooting (OOM, weight downloads).
 
 The following reference files are **stubs for v2** — they document
 intended scope and detection logic but are **not implementations**.
@@ -306,9 +354,9 @@ Do not follow them as workflows. If a user asks about one of these
 backends, point at the stub for an honest description of the limit
 and pick a v1-supported alternative.
 
-- `references/amber.md`         (stub — planned for v2, not implemented)
-- `references/gaussian.md`      (stub — planned for v2, not implemented)
-- `references/ml_potentials.md` (stub — planned for v2, not implemented)
+- `references/amber.md`         (stub — small-molecule GAFF2 path
+                                 lands in v2.2; protein/NA in v2.3)
+- `references/gaussian.md`      (stub — planned for v2.4)
 
 ## Defaults and conventions
 
@@ -341,11 +389,20 @@ When you finish a task, report:
 ## What v1 does NOT support
 
 Tell the user honestly when their request crosses the line:
-- Amber, Gaussian, VASP, Quantum ESPRESSO (planned for v2)
-- ML potentials — MACE, CHGNet, ORB, etc. (planned for v2). If a user
-  asks for one, say: "v2 will support those; for now GFN2-xTB is in
-  the same accuracy ballpark for organics at ~10× the cost."
-- Free energy methods, enhanced sampling, metadynamics
+- Amber for protein / nucleic-acid MD — small-molecule GAFF2 lands
+  in v2.2; protein (ff19SB+OPC) and nucleic-acid (OL21) MD in v2.3.
+- Gaussian (DFT) — planned for v2.4. If the user has g16/g09 on PATH,
+  `check_env.py` will report it under `[v2 preview]`.
+- VASP, Quantum ESPRESSO — no v2 plan; community CP2K / FHI-aims
+  bridges may land in v3.
+- Other ML potentials — CHGNet (charge-aware materials), Orb-v3
+  (confidence-head OOD signal), M3GNet, SevenNet — planned for v2.2+.
+  v1.2 ships MACE only; if a user asks for the others, say "v2.2 is
+  slated to add CHGNet for charge-aware materials; today MACE-MP-0
+  covers most of the same systems with the cross-validation contract
+  documented in `references/ml_potentials.md`."
+- Free energy methods, enhanced sampling, metadynamics.
 - Implicit/explicit solvation models beyond TIP3P water clusters
-- SLURM/HPC submission scripts
-- Web GUI / visualization servers
+  (GAFF2 + TIP3P/OPC arrives in v2.2 for small molecules).
+- SLURM/HPC submission scripts.
+- Web GUI / visualization servers.

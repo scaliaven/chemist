@@ -1,139 +1,164 @@
-# ML Potentials Reference (STUB — planned for v2, not implemented)
+# ML Potentials Reference (v1.2 — MACE-MP-0 + MACE-OFF)
 
-> **ML potentials are not yet supported by the ase-simulation skill.**
-> Do not import `mace_torch`, `chgnet`, `matgl`, `sevenn`, or
-> `orb_models` in a skill response, and do not construct an ASE
-> calculator from any of them. This file exists to (a) document how
-> the environment detects each package, (b) record the intended v2
-> scope, and (c) capture the open questions that two weeks of real-
-> usage data are expected to answer.
+This file replaces the v2 stub. v1.2 ships **MACE-MP-0** (89-element
+materials foundation model) and **MACE-OFF** (10-element organics
+foundation model) as supported ASE Calculators, both via
+`pip install mace-torch`. The framing remains: ML potentials are an
+**accelerator on top of trusted methods, not a replacement.** The
+cross-validation contract (§2) is what makes that statement honest;
+do not turn it off without a specific reason.
 
-## §1. Status
+## §1. Method-selection rules
 
-ML potentials are planned for **v2**. They are not currently supported.
+The MACE branch is for **systems where GFN2-xTB is too slow**, not for
+systems where GFN2-xTB is fine. Use these in order:
 
-The framing — and this matters — is that ML potentials are an
-**accelerator on top of trusted methods, not a replacement for them.**
-A good v2 chapter on ML potentials will look more like "here is how to
-get a 100× speedup with cross-validation against xTB or DFT" than "here
-is a black-box DFT replacement." When users ask about ML potentials
-today, set that expectation explicitly:
+1. **System has < ~500 atoms** → use GFN2-xTB. Faster than MACE on CPU,
+   no model-weights download, no validation overhead, fully trusted.
+2. **System has ~500–1000 atoms and the task is dynamics** → use
+   GFN2-xTB if the run is short (~10 ps), MACE if the run is long
+   (>~50 ps). xTB scales O(N³) so the wall-clock crossover is duration-
+   sensitive.
+3. **System has > ~1000 atoms** → use MACE. Routing:
+   - All elements ∈ {H, C, N, O, P, S, F, Cl, Br, I} → **MACE-OFF**
+     (the organics foundation model; outperforms GFN2-xTB on torsions
+     and conformers).
+   - Otherwise → **MACE-MP-0** (the materials foundation model;
+     covers 89 elements, MPTrj+sAlex training).
+   - Override with `--mace-system-class organic` or `materials` if you
+     want to force a specific model (e.g., a metal–organic framework
+     where the auto-rule picks MACE-MP-0 but you'd rather use
+     MACE-OFF on the organic ligands separately).
+4. **System has > ~2000 atoms (40 GB GPU) or > ~1000 atoms (CPU)** →
+   you're past the practical MACE-medium ceiling. Drop to
+   `--mace-size small` first; if that still OOMs, shrink the system
+   or wait for v2.2's CHGNet/Orb integration.
 
-- For organic / main-group systems, recommend **GFN2-xTB**. It is
-  trusted, it has no calibration burden, and it covers most v1 use
-  cases. Note honestly that it gets impractical past ~1k atoms — that
-  is precisely where ML potentials are intended to land.
-- For inorganic materials and bulk crystals, recommend **EMT** (for
-  EMT-supported metals) or honest acknowledgment that v1 has no
-  general-purpose materials calculator.
-- If the user explicitly wants MACE / CHGNet / Orb today, tell them
-  the skill cannot drive these yet. They can run the package directly
-  outside the skill; the skill can help with **trajectory analysis**
-  afterwards via `analyze_traj.py`.
-- Do **not** spin up an ML potential inline in a skill response. The
-  validation infrastructure (cross-checks against xTB or DFT, drift
-  monitoring, OOM handling on GPU) is not in place yet, and getting
-  it wrong silently produces a plausible-looking PES that is wrong in
-  ways the user will not notice.
+The skill's bundled scripts wire this in:
+- `scripts/optimize.py --calculator mace [--mace-system-class ...]
+  [--mace-size small|medium|large]`
+- `scripts/run_md.py --calculator mace [...]`
 
-## §2. Detection
+## §2. Cross-validation contract
 
-`scripts/check_env.py` should try to import each of the major ML
-potential packages and report version-or-missing for each. None of
-these affect the v1 capability summary; they appear only in the v2
-preview block.
+ML potentials produce plausible-looking energies and forces that can be
+**wrong in ways the user does not notice**. The skill's load-bearing
+defense against that is mandatory cross-validation against GFN2-xTB:
 
-| Package | Import name | Foundation model(s) of interest |
-|---|---|---|
-| MACE | `mace_torch` | MACE-MP-0 (organics + materials) |
-| CHGNet | `chgnet` | CHGNet (inorganic materials, charge-aware) |
-| M3GNet | `matgl` | M3GNet via the unified matgl package |
-| SevenNet | `sevenn` | SevenNet-0, SevenNet-l3i5 |
-| Orb | `orb_models` | Orb-v2 (materials foundation model) |
+- **`run_md.py` validates by default** when `--calculator mace` is
+  used. Every `--validate-every` ps (default `1.0`) it copies the live
+  `atoms`, attaches `tblite`'s GFN2-xTB calculator, recomputes
+  energy + forces, and writes a row to `validation.csv`:
+  ```
+  step,MAE_E_meV,MAE_F_meV_per_A,max_F_dev_meV_per_A
+  ```
+- **The MD aborts** when `MAE_F > --abort-mae-f` meV/Å (default 100 —
+  the published rule of thumb for "trajectory drifted out of training
+  distribution"). On abort, the script prints the breach step, flushes
+  the CSV, and exits with code 3. Trust the trajectory only up to the
+  step preceding the breach.
+- **Opt-out is available but not the default.** `--no-validate`
+  disables validation for that run; use it only when (a) the run is
+  short enough that you don't care, or (b) you've already validated a
+  representative window and are extending it. Do not opt out as a
+  matter of habit.
+- **Post-hoc validation** of a saved trajectory uses
+  `scripts/validate_ml_md.py --trajectory md.traj`. Same threshold,
+  same CSV format. Use it when you ran with `--no-validate` and now
+  want to check, or when you want to re-validate at a finer stride.
 
-Reporting rule: for each package, attempt the import; on success report
-the package name and version, on failure report "not installed." Do
-**not** attempt to download any model weights at env-check time — model
-download is a runtime concern and a multi-GB network operation has no
-business in a status check.
+This contract is the basis on which the skill recommends MACE at all.
+If the user asks to disable it permanently, that's a real conversation
+about their use case (validation-rich exploratory runs vs. production
+where xTB is unaffordable), not a flag flip.
 
-GPU availability also matters for ML potentials but is **out of scope**
-for this stub's detection — `torch.cuda.is_available()` is a separate
-concern that v2 will fold in when the calculator wrappers actually
-need it.
+## §3. Known failure modes
 
-## §3. Scope when implemented (v2)
+These are documented limits where MACE produces wrong but plausible
+output. Tell the user before they hit them, not after.
 
-When v2 work begins on ML potentials, the chapter that replaces this
-stub will cover:
+- **Liquid mixtures (ethanol-water etc.).** MACE-MP-0 has documented
+  qualitative density and structure errors on aqueous mixtures
+  (Rowan analyses, 2024). For mixtures use TIP3P + classical force
+  fields where available, or accept that MACE is exploratory only.
+- **Out-of-distribution geometries** during MD. The cross-validation
+  contract is the primary defense; a fast-rising MAE_F is the abort
+  signal. If validation shows MAE_F climbing without breaching, the
+  trajectory is still flagged — examine `validation.csv` before
+  trusting downstream analysis.
+- **Hard-element edge cases.** MACE-MP-0 covers 89 elements but
+  performance is best on the MPTrj-trained subset. Lanthanides,
+  actinides, and exotic main-group oxidation states get weaker
+  forces. Cross-check against a published phonon or formation-
+  energy benchmark for the element class.
+- **Practical size cliff.** Medium MACE on a 40 GB GPU runs out of
+  VRAM around 1–2k atoms; CPU mode roughly halves that ceiling.
+  `check_env.py` prints free VRAM so the size warning is grounded
+  in your actual box.
+- **Reactive chemistry.** MACE foundation models are trained on
+  near-equilibrium configurations. Bond-breaking / bond-forming
+  events (single-step reactions, transition states) are out of
+  distribution and will produce silent garbage. Use GFN2-xTB or
+  DFT for those — and run cross-validation if you must use MACE.
 
-- **MACE-MP-0** as an ASE Calculator drop-in for inorganic crystals,
-  bulk materials, and mixed systems (89-element coverage), used for
-  geometry optimization and MD on systems where GFN2-xTB is too slow.
-- **MACE-OFF** (the organics-trained MACE foundation model, 10
-  elements: H/C/N/O/P/S/F/Cl/Br/I) as the parallel drop-in for
-  pure-organic systems where it outperforms GFN2-xTB on torsions and
-  conformers. **Same vendor, single install (`pip install
-  mace-torch`)** — chosen over MACE-MP-0 + CHGNet because the dual-
-  vendor pairing duplicates dependencies and forces awkward
-  "is this organic enough for CHGNet to break?" routing logic.
-  CHGNet is **deferred to v2.2** and lands when battery-cathode /
-  charge-aware materials become a documented usage pattern.
-- An **explicit, mandatory cross-validation contract.** Every v2 MD
-  run with an ML potential validates by default: at every checkpoint
-  interval (default 1 ps), recompute energy and forces on the latest
-  frame through GFN2-xTB (organics) or a user-supplied reference
-  (materials); write `validation.csv` with `step, MAE_E_meV,
-  MAE_F_meV_per_A, max_F_dev_meV_per_A`; abort the run when
-  `MAE_F > 100 meV/Å`. Users who want raw speed can opt out with
-  `--no-validate`, but the default is on. This is non-negotiable —
-  ML potentials produce plausible-looking PESs that are wrong in
-  ways users do not notice, so the skill cannot recommend them
-  honestly without an integrated check.
-- Clear **size and accuracy guidance**: practical ceiling on a 40 GB
-  GPU is **~1–2k atoms** with MACE medium, not the 10k figure earlier
-  drafts of this stub claimed. CPU mode is ~10× slower; the size
-  cliff effectively halves there. Users hitting OOM should drop to
-  the small model or shrink the system, not push through.
+## §4. GPU/CPU notes
 
-It will explicitly **not** cover, in v2:
+- `check_env.py` reports `torch.cuda.is_available()` and free VRAM.
+  When CUDA is unavailable, `make_ml_calc` falls back to CPU and
+  prints a one-line warning. Production runs on CPU are workable
+  but ~10× slower than GPU; the size cliff drops to ~500–1000 atoms.
+- `--mace-device cuda|cpu` overrides auto-detection. Useful for
+  debugging (force CPU to avoid OOM diagnostics) or for shared GPU
+  systems where you want to be explicit.
+- `--mace-size small|medium|large` trades speed for accuracy.
+  Default `medium` is the published "first to reach for"; drop to
+  `small` only if OOM is unavoidable.
+- Model weights are downloaded **on first use** (HuggingFace Hub
+  under the hood). The download is multi-hundred-MB; it is cached
+  per-user and not redone. `check_env.py` does not download weights
+  to keep environment checks fast.
 
-- **Training new ML potentials.** That is a research workflow with its
-  own dataset / loss / hyperparameter ecosystem; it does not belong in
-  a simulation-orchestration skill.
-- **Fine-tuning foundation models** (MACE-MP-0, Orb, CHGNet) on user
-  data. Same reasoning — research workflow, not skill workflow.
+## §5. Troubleshooting
+
+- **`OutOfMemoryError` from CUDA.** Drop `--mace-size` to `small`,
+  or shrink the system. If the system is rigid (a crystal), reducing
+  the supercell often gets you under the ceiling without changing the
+  physics. As a last resort, `--mace-device cpu` accepts the
+  slowdown for an OOM-free run.
+- **Weights download fails or hangs.** Hugging Face Hub access can be
+  blocked on some HPC nodes. Download MACE weights on a login node,
+  then point `mace-torch` at the cached path (env var `HF_HOME`).
+- **`MAE_F` blows up immediately** (frame 0 or frame 1). Three usual
+  causes: (a) wrong-element routing — check that MACE-OFF was picked
+  for an organic system; (b) wrong charge/multiplicity; (c) the
+  reference (xTB) is itself failing — re-run with `--calculator xtb`
+  alone to confirm xTB converges.
+- **Validation makes the run too slow.** Increase `--validate-every`
+  (default 1.0 ps; try 5.0 for slow-changing systems). Do not set
+  `--no-validate` as the first move.
+
+## §6. Out of scope (explicitly, even in v1.2)
+
+These are not in v1.2 and are not blocking issues — they are research
+or scope decisions:
+
+- **Training new ML potentials.** Research workflow with its own
+  dataset/loss/hyperparameter ecosystem; does not belong in a
+  simulation-orchestration skill.
+- **Fine-tuning foundation models** (MACE-MP-0, MACE-OFF, Orb,
+  CHGNet) on user data. Same reasoning.
 - **Active-learning loops** that alternate ML inference with reference
-  DFT calls and retrain. These are end-to-end research projects and
-  the skill should not pretend to drive them.
-- **Equivariant / message-passing internals.** v2 will use these
-  packages as black-box ASE calculators. Anyone who needs to peek
-  inside should read the package docs directly.
+  DFT calls and retrain.
+- **Equivariant / message-passing internals.** v1.2 uses MACE as a
+  black-box ASE calculator. Anyone who needs to peek inside should
+  read the package docs directly.
 
-These are explicitly v3+ (or "not in scope at all") candidates.
+Future v2.2+ adds (gated on usage data):
 
-## §4. Open questions (to be answered by usage data)
-
-1. **Which package is the dominant ask — MACE, CHGNet, Orb, or
-   something else?** *Answered (2026-05-07): MACE.* The MACE-MP-0 +
-   MACE-OFF pairing is the only foundation-model line with first-class
-   checkpoints for **both** sides of the v1 method tree (materials and
-   organics) under a single install. CHGNet → v2.2 (charge-aware
-   materials), Orb-v3 → v2.2+ (confidence-head OOD signal). Other
-   packages (M3GNet, SevenNet, MatterSim) stay in detection-only
-   `[v2 preview]` until usage data argues for them.
-2. **Molecules or materials — which audience is louder?** MACE-MP-0
-   covers both but the workflows diverge (MD vs. structure search,
-   PBC vs. no PBC, charges vs. no charges).
-3. **What system size do users actually want ML for?** If most
-   requests are 200–500 atoms (where xTB is fine), the case for ML
-   weakens; if requests cluster at 5k–50k, ML is a clear win and the
-   cross-validation overhead is acceptable.
-4. **Is the cross-validation overhead acceptable, or do users want
-   raw speed?** A snapshot every 1 ps through xTB is meaningful but
-   non-trivial; users may push back. The right framing depends on
-   what they're using ML for (production trajectories vs. exploratory
-   sampling).
-5. **GPU assumption.** When v2 lands, do most skill users have a GPU
-   available? CPU MACE is usable but ~10× slower; if most users are
-   CPU-only the size-cliff calculus changes.
+- **CHGNet** for charge-aware materials (battery cathodes,
+  oxidation-state-sensitive systems).
+- **Orb-v3** with its built-in confidence head (per-atom binned
+  force-error predictions) for richer OOD signal than committee
+  uncertainty alone.
+- **Committee-uncertainty heads** on a frozen MACE-MP-0 backbone,
+  per the multi-head committee work (JCP 2025; arXiv 2508.09907).
