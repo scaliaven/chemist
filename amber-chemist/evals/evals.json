@@ -1,0 +1,30 @@
+{
+  "_comment": "5 evaluation prompts for amber-chemist v1.0. Free-form expected outputs for manual review; no programmatic assertions in v1.0.",
+  "evals": [
+    {
+      "id": "e1_md_standard",
+      "prompt": "Run 5 ns of GAFF2 explicit-solvent MD on caffeine in TIP3P water at 300 K with the Monte Carlo barostat. Net charge 0. Starting structure in caffeine.xyz. Write the script; don't execute.",
+      "expected": "Use amber_run.py --mode standard with --time 5ns, --barostat monte_carlo, --net-charge 0, --temperature 300. Mention the prep stage (antechamber + parmchk2 + tleap) and the four-stage chain (min -> heat -> density -> prod). Do not silently default to a different barostat."
+    },
+    {
+      "id": "e2_remd",
+      "prompt": "Run T-REMD on caffeine in TIP3P GAFF2: 8 replicas spanning 300-400 K, exchanges every 1000 steps, 1 ns per replica. Net charge 0. Write the scripts; don't execute.",
+      "expected": "Use amber_run.py --mode remd or amber_remd.py directly. Cite pmemd.cuda.MPI -rem 1, the geometric ladder default, and the per-replica directory layout (replica_NN/prod.{in,nc,rst7,mdout}). Note that the script auto-reports per-pair exchange acceptance rates and warns if any pair's rate falls outside [15%, 50%]."
+    },
+    {
+      "id": "e3_extend",
+      "prompt": "I have prod.rst7, prod.mdout, prod.nc and system.prmtop from a finished 1 ns run in run/. Extend it by another 2 ns. Write the script; don't execute.",
+      "expected": "Use amber_md.py --extend --stage prod with --n-steps 1000000 (2 ns at 2 fs). Explain that --extend auto-numbers prod_2.{nc,rst7,mdout} and reads from the existing prod.rst7. Do not propose --restart (that's for chaining different stages)."
+    },
+    {
+      "id": "e4_mmpbsa",
+      "prompt": "I have prod.nc, complex.prmtop, receptor.prmtop, ligand.prmtop. Compute MMPBSA endpoint binding free energy with GB model 2. Write the script; don't execute.",
+      "expected": "Use amber_score.py with --method gb --gb-model 2 and the three prmtops + trajectory. Note that the script writes <prefix>.in (MMPBSA input deck) and parses FINAL_RESULTS_MMPBSA.dat into a JSON summary. Reference scoring.md if MMPBSA semantics come up."
+    },
+    {
+      "id": "e5_protein_md_deferral",
+      "prompt": "I want to run ff19SB+OPC MD on a 100-residue protein. Walk me through the workflow this skill supports.",
+      "expected": "Honest deferral: v1.0 ships GAFF2-only prep; ff19SB + OPC for proteins is a v1.1 architectural pre-wire (raises NotImplementedError today). Point to references/extension_map.md and references/force_fields.md. Suggest options: BYO prmtop via --from-prmtop on amber_run.py / amber_md.py if the user has one already; otherwise wait for v1.1."
+    }
+  ]
+}

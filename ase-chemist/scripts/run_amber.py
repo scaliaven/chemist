@@ -214,7 +214,7 @@ def main() -> int:
 
     print("[amber] CARVE-OUT NOTE: the MD integration loop runs natively in")
     print("[amber]   pmemd / pmemd.cuda / sander, NOT through ASE. Amber is")
-    print("[amber]   the only engine in ase-simulation that bypasses ASE.")
+    print("[amber]   the only engine in ase-chemist that bypasses ASE.")
     print("[amber]   This is a performance choice, not forced — ASE has an")
     print("[amber]   in-process Amber Calculator (ase.calculators.amber.SANDER")
     print("[amber]   via pysander) that would be ASE-coherent, but it is")

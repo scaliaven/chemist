@@ -164,7 +164,7 @@ def main() -> int:
     print("[gaff2]   binaries (antechamber/parmchk2/tleap), NOT through ASE.")
     print("[gaff2]   The resulting .prmtop/.rst7 feeds run_amber.py for MD")
     print("[gaff2]   (also non-ASE). Amber is the only engine in")
-    print("[gaff2]   ase-simulation that bypasses ASE — chosen for pmemd.cuda")
+    print("[gaff2]   ase-chemist that bypasses ASE — chosen for pmemd.cuda")
     print("[gaff2]   throughput; an in-process ASE path via pysander/SANDER")
     print("[gaff2]   exists but is CPU-only and ~10-50x slower. Trade under")
     print("[gaff2]   review; see references/amber.md §1 and PLAN.md §Phase 3.")

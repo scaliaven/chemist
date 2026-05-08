@@ -1,6 +1,6 @@
 # v2 Implementation Plan
 
-Working plan for the v2 surface of the `ase-simulation` skill, sequenced
+Working plan for the v2 surface of the `ase-chemist` skill, sequenced
 on the `dev` branch. Inputs to this plan: the three v2 stubs landed in
 commit `5716b7e` (2026-05-07) and the three subagent research reports
 that followed.
@@ -182,7 +182,7 @@ Update PLAN.md as each lands or as data arrives.
 
 - **Amber path: keep, switch to SANDER+ASE, or remove?** v1.3 ships
   GAFF2 small-molecule MD via shell-out to AmberTools and pmemd.
-  **Amber is the only engine in `ase-simulation` that does not run
+  **Amber is the only engine in `ase-chemist` that does not run
   through ASE** (every other backend is wrapped as an ASE Calculator
   and driven in-process). The carve-out was a **performance choice,
   not forced** — `ase.calculators.amber.SANDER` (pysander Python
@@ -219,6 +219,17 @@ Update PLAN.md as each lands or as data arrives.
   want production-length runs at scale, **and** there's appetite to
   invest in a wrapper, pick (4). Otherwise (1) holds — the carve-out
   is the tax for production speed without engineering work.
+
+  **Fifth option (taken in 2026-05):** keep the v1.3 carve-out as-is,
+  ship `amber-chemist` as a sibling Amber-native skill alongside that
+  grows the deeper Amber surface (REMD, implicit-solvent, cpptraj-
+  driven analysis, MMPBSA scoring, ff19SB/OL21 in v1.1). The carve-
+  out then handles "GAFF2 + plain NPT MD inside an ASE workflow"
+  prompts; `amber-chemist` handles "run Amber natively." Routing
+  falls out of the trigger-phrase split (Amber-deep phrases reach
+  `amber-chemist`; ASE-shaped phrases reach this skill). v1.0 of
+  `amber-chemist` ships in `amber-chemist/` next to `ase-chemist/`
+  and inherits the three-copy mirror rule.
 - **ML**: molecules-vs-materials audience balance; system-size
   distribution; whether mandatory cross-validation overhead is
   acceptable; GPU prevalence among skill users.
@@ -361,7 +372,7 @@ ladder beat seven that don't compose.
 
 ## Sequencing rules
 
-- Don't sync to `.claude/skills/ase-simulation/` until a phase's
+- Don't sync to `.claude/skills/ase-chemist/` until a phase's
   trigger tests pass against the dev source. Mid-phase syncs change
   the live trigger surface and contaminate in-flight test runs.
 - Each phase ends with a single commit on `dev` and a re-run of

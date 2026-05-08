@@ -1,5 +1,5 @@
 ---
-name: ase-simulation
+name: ase-chemist
 description: Use this skill whenever the user wants to run, set up, or analyze atomistic simulations on molecules or materials. This covers: molecular dynamics (MD, NVE, NVT, NPT, Langevin, Nose-Hoover) including thermalization, equilibration, and "warm up the system" requests; geometry optimization, energy minimization, or relaxation (BFGS, FIRE, LBFGS — "minimize this molecule", "relax this structure", "find the equilibrium geometry"); vibrational frequency, normal-mode, Hessian, and zero-point-energy analysis; NEB and transition-state searches; structure building (small molecules, bulk crystals, surfaces like fcc111, slabs with adsorbates); trajectory analysis (RMSD, RMSF, RDF, energy drift); single-point energy and force evaluation; binding, interaction, and adsorption energy calculations; explicit-solvent small-molecule MD with GAFF2 + AM1-BCC charges via antechamber and pmemd; **DFT calculations via Gaussian — single-point energies, geometry optimization, frequency / thermochemistry analysis (ZPE, enthalpy, Gibbs free energy)** with B3LYP / ωB97X-D / M06-2X / PBE0 etc.; and electronic observables like HOMO-LUMO gap, dipole moment, or Mulliken charges. Use this skill for any request involving force fields (GAFF2, AM1-BCC, classical MM), semi-empirical methods (xTB / GFN1 / GFN2), foundation-model ML potentials (MACE-MP-0, MACE-OFF), DFT through Gaussian (B3LYP, ωB97X-D, M06-2X, PBE0, def2-TZVP, 6-31G(d), SMD/PCM solvation), DFT-style reasoning about which method to pick, or any computational chemistry / materials task that mentions ASE, EMT, Lennard-Jones, TIP3P, tblite, xtb, MACE, antechamber, tleap, sander, pmemd, Gaussian, g16, or g09. Reach for this skill even when the user does not name ASE — phrases like "minimize this molecule", "relax this geometry", "thermalize at 300 K", "equilibrate the system", "compute the binding energy", "run MD on water", "build a Pt(111) slab", "compute frequencies", "speed up this MD with a foundation model", "use MACE", "run a 5000-atom system", "ligand MD in water", "GAFF2 parameterization", "AM1-BCC charges", "explicit-solvent MD of this drug molecule", "antechamber", "run a DFT calculation", "compute thermochemistry at B3LYP/def2-TZVP", "Gibbs free energy of this reaction", "Gaussian SMD water", or "DFT frequency analysis" should all trigger this skill.
 license: MIT
 ---
@@ -182,37 +182,25 @@ meaningless.
 
 ## Verification & clarification
 
-Two failure modes hurt this skill the most: (a) silently picking the wrong
-physics or wrong parameters, and (b) re-asking the user something that the
-prompt or the structure file already answers. Counter both with the rules
-below.
+### Don't ask what's already named — and frame what you do ask
 
-### Clarify yourself first — only ask when you actually can't tell
+The two failure modes to avoid: silently picking wrong physics (EMT
+on an organic returns plausible nonsense; 2 fs timestep without
+hydrogen constraints; MACE-OFF on a system with metals; Gaussian
+DFT without explicit method/basis), and re-asking the user something
+the prompt or structure file already names.
 
-Before asking the user anything, exhaust what is already determined:
-
-- **Read the structure file.** Element list, atom count, periodicity,
-  whether it's a slab, charge/multiplicity if present — `ase.io.read` and
-  inspect. Don't ask "is this a metal?" if the file says `Pt`.
-- **Re-read the prompt for already-named specs.** "MD at 300 K for 10 ps"
-  has named the temperature, the duration, and (implicitly, by "at") an
-  NVT ensemble. Don't re-ask any of them.
-- **Run `check_env.py`** so you know which calculators are available before
-  recommending one.
-- **Apply the method-selection tree above** to derive a defensible default
-  from system + task. If the rules give a unique answer, that's your
-  answer — don't ask the user to choose.
-
-When the answer is still genuinely underdetermined after all of that, *then*
-ask. Frame the question with the option you'd pick and the reason — e.g.,
-"GFN2-xTB looks right here because the system has heteroatoms; want me to
-fall back to GFN1 for d-block robustness instead?" — beats a blank "which
+When the answer is genuinely underdetermined, frame the question
+with the option you'd pick and the reason — e.g., *"GFN2-xTB looks
+right here because the system has heteroatoms; want me to fall back
+to GFN1 for d-block robustness instead?"* — beats a blank "which
 method?".
 
 ### Ask the user to verify before recommending execution
 
-After choosing parameters, restate them in a short block and ask the user to
-confirm before suggesting they run anything. The minimum to surface:
+After choosing parameters, restate them in a short block and ask the
+user to confirm before suggesting they run anything. The minimum to
+surface:
 
 - Calculator (and GFN level if applicable)
 - Optimizer / ensemble
@@ -220,11 +208,8 @@ confirm before suggesting they run anything. The minimum to surface:
 - For optimization: fmax, max_steps
 - Output paths that will be written
 
-Keep it tight — a 4–6 line summary, not a paragraph. If the user has
-already explicitly approved the plan in this conversation, don't re-ask.
-The point is to catch wrong-physics and wrong-parameter mistakes (EMT on
-an organic, 2 fs timestep with unconstrained H) before they cost the user
-wall-clock time, not to gate every interaction.
+Keep it tight — a 4-6 line summary, not a paragraph. If the user has
+already approved the plan, don't re-ask.
 
 ## Scripts — when to invoke each
 
@@ -462,6 +447,16 @@ comes up; do not preload them all.
   errors, solvation mismatch across SP/Opt/Freq chain, GAUSS_SCRDIR
   issues), troubleshooting. Opt=TS / IRC / NBO / TDDFT / post-HF
   are explicitly deferred to v3+.
+
+**Smell test — don't fabricate technical semantics.** If you are
+about to write *"I think `<keyword>` defaults to ..."* or *"the
+standard value for `<flag>` is roughly ..."* — for a Gaussian route
+line, an xTB GFN convention, a MACE element-set rule, an Amber mdin
+keyword, or any other domain-specific knob — stop and check the
+right reference file (or its upstream manual). Hallucinated semantics
+is a high-cost, hard-to-detect failure mode because the calculation
+often *runs* with the wrong value and produces plausible-looking
+output.
 
 ## Defaults and conventions
 

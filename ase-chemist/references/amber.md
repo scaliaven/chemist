@@ -4,7 +4,7 @@ v1.3 ships **GAFF2 + AM1-BCC** small-molecule explicit-solvent MD via
 two scripts (`scripts/parameterize_gaff2.py`, `scripts/run_amber.py`)
 that shell out to AmberTools (`antechamber`, `parmchk2`, `tleap`) and
 Amber MD engines (`pmemd.cuda` > `pmemd` > `sander`). Amber is the
-**only engine in `ase-simulation` that does not run through ASE** —
+**only engine in `ase-chemist` that does not run through ASE** —
 the architectural carve-out and its review options are documented in
 [`amber_carveout.md`](amber_carveout.md). Protein and nucleic-acid MD
 (ff19SB+OPC, OL21) are deferred to **v2.3**.

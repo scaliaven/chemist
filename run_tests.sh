@@ -7,6 +7,11 @@ set -uo pipefail
 OUT=results
 mkdir -p "$OUT"
 
+# Non-gating environment summary; helps interpret skill behavior in logs.
+if [ -x "$(command -v python)" ]; then
+  python amber-chemist/scripts/check_env.py --summary-only > "$OUT/amber-chemist_env.txt" 2>&1 || true
+fi
+
 # Per-run wall-clock limit. 180s is enough for Claude to read SKILL.md,
 # read 1-2 reference files, and write a code response. It's NOT enough to
 # run a real MD simulation, which is what we want — we're testing whether
@@ -64,7 +69,7 @@ run_one p5_build_struct  trigger     "Build a Pt(111) surface, 4 layers, 4x4, wi
 # "run a 5000-atom system") and the method-selection rule that points
 # past the xTB cliff at MACE.
 run_one p10_mace_named   trigger     "Run NVT MD on test-inputs/caffeine.xyz at 300 K for 50 ps using MACE-OFF. Write the script; don't execute it."
-run_one p11_size_cliff   trigger     "I want to run molecular dynamics on a 5000-atom organic system. What's the right approach with the ase-simulation tools? Don't run anything; just walk me through method selection."
+run_one p11_size_cliff   trigger     "I want to run molecular dynamics on a 5000-atom organic system. What's the right approach with the ase-chemist tools? Don't run anything; just walk me through method selection."
 
 # v1.3 — Amber GAFF2 small-molecule MD. Tests the antechamber / GAFF2 /
 # explicit-solvent triggers added in SKILL.md description and the new
@@ -75,7 +80,7 @@ run_one p13_antechamber  trigger     "Parameterize the molecule in test-inputs/c
 # v1.3 borderline — protein MD is deferred to v2.3. Skill should still
 # trigger but explain the v1.3 limit honestly (BYO-prmtop with run_amber.py;
 # ff19SB+OPC support is v2.3 territory).
-run_one p14_protein_md   borderline  "I want to run MD on a protein in explicit solvent. How would you approach it with the ase-simulation tools? Don't run anything."
+run_one p14_protein_md   borderline  "I want to run MD on a protein in explicit solvent. How would you approach it with the ase-chemist tools? Don't run anything."
 
 # v1.4 — Gaussian DFT (SP / Opt / Freq). Tests the trigger contract for
 # DFT-named methods (B3LYP, ωB97X-D, def2-TZVP), the no-defaults policy
@@ -93,6 +98,24 @@ run_one p6_general_know  no_trigger  "What's the boiling point of water at 1 atm
 run_one p7_python_only   no_trigger  "Write a Python function that takes a list of dicts and groups them by a key."
 run_one p8_definitional  borderline  "Explain the difference between NVT and NPT ensembles."
 run_one p9_borderline    borderline  "How does Langevin dynamics work?"
+
+# amber-chemist v1.0 trigger tests. MD core (a1-a4), REMD core (a3, a5, a11),
+# add-ons (a6-a9). Borderlines at the bottom: deferred features (a13) and
+# missing-MPI (a14) test honest deferral.
+run_one a1_md_named         trigger     "Run 5 ns of GAFF2 explicit-solvent MD on test-inputs/caffeine.xyz in TIP3P, NPT at 300 K with the Monte Carlo barostat. Net charge 0. Write the scripts; don't execute."
+run_one a2_extend           trigger     "I have prod.rst7, prod.mdout, prod.nc and system.prmtop from a finished 1 ns run. Extend it by another 2 ns. Write the script; don't execute."
+run_one a3_remd             trigger     "Run T-REMD on caffeine in TIP3P GAFF2 with 8 replicas spanning 300-400 K, exchanges every 1000 steps, 1 ns per replica. Write the scripts and groupfile; don't execute."
+run_one a4_implicit         trigger     "Run 5 ns implicit-solvent MD on caffeine using GB (igb=2) at 300 K. Net charge 0. Write the scripts; don't execute."
+run_one a5_demux            trigger     "I have a finished T-REMD run in remd_out/. Demux it into per-temperature trajectories and plot RMSD vs the first frame for each. Don't execute."
+run_one a6_mmpbsa           trigger     "I have prod.nc, complex.prmtop, receptor.prmtop, ligand.prmtop. Compute MMPBSA endpoint binding free energy with GB model 2. Write the script; don't execute."
+run_one a7_alanine          trigger     "Run an alanine scan on a 5-residue interface using MMPBSA. I have complex/receptor/ligand prmtops and a 100 ns production trajectory. Write the deck; don't execute."
+run_one a8_cpptraj          trigger     "Run cpptraj-driven RMSD and RMSF on test-inputs/prod.nc with topology test-inputs/system.prmtop, masks @CA. Write the script; don't execute."
+run_one a9_esander          trigger     "Per-frame energy decomposition via cpptraj esander on prod.nc with system.prmtop, every 10 frames. Write the script; don't execute."
+run_one a10_ff19sb          trigger     "I want ff19SB+OPC MD on a 100-residue protein. Walk me through the workflow this skill supports. Don't run anything."
+run_one a11_remd_ladder     trigger     "I asked for T-REMD spanning 280-500 K with 6 replicas - what's wrong with that ladder? How do I tune it?"
+run_one a12_collision       trigger     "Run 1 ns of explicit-solvent MD on caffeine in TIP3P water using GAFF2. Starting structure: test-inputs/caffeine.xyz, net charge 0. Write the scripts; don't execute."
+run_one a13_amd_borderline  borderline  "Run accelerated MD (aMD) on this system. Does this skill handle it?"
+run_one a14_remd_no_mpi     borderline  "I want to run REMD but I only have non-MPI pmemd.cuda. What can this skill do?"
 
 # Quick summary so you know at a glance what to investigate.
 echo

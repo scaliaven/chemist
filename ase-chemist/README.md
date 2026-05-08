@@ -1,10 +1,10 @@
-# ase-simulation
+# ase-chemist
 
 > An Agent Skill that turns *"I want to simulate this molecule"* into a
 > running calculation — with the method picked for the system at hand,
 > not for whatever the user happened to type.
 
-`ase-simulation` is a Claude Code skill for atomistic / molecular
+`ase-chemist` is a Claude Code skill for atomistic / molecular
 simulation. Hand it a structure file and a question; it walks a
 documented method-selection tree, picks the right calculator from
 seven supported backends, runs the calculation through ASE, and
@@ -196,7 +196,7 @@ conda install -c conda-forge ambertools
 Sanity-check after install:
 
 ```bash
-python ase-simulation/scripts/check_env.py
+python ase-chemist/scripts/check_env.py
 ```
 
 The output ends with a one-line `[SUMMARY]` of what your environment
@@ -209,7 +209,7 @@ or LJ would already cover the question.
 ## Layout
 
 ```
-ase-simulation/
+ase-chemist/
 ├── SKILL.md                  # trigger contract + method-selection tree
 ├── README.md                 # this file
 ├── scripts/                  # 12 scripts (one per task; see SKILL.md for the catalog)
@@ -276,5 +276,5 @@ workflows.
   iteration 2's job — `PLAN.md` v2.0 milestones.
 - See `CLAUDE.md` at the repo root for the load-bearing design
   decisions and the duplication rules across the three skill copies
-  (`ase-simulation/`, `.claude/skills/ase-simulation/`,
-  `~/.claude/skills/ase-simulation/`).
+  (`ase-chemist/`, `.claude/skills/ase-chemist/`,
+  `~/.claude/skills/ase-chemist/`).
