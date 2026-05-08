@@ -75,6 +75,59 @@ on PATH. AmberTools25 is fully open-source, including pmemd.cuda; if
 the user is on a fresh install and missing pmemd.cuda, point them at
 `https://ambermd.org/GetAmber.php`.
 
+## Verification & clarification
+
+### Don't ask what's already named — and frame what you do ask
+
+The two failure modes to avoid: silently picking wrong physics (a
+wrong `--net-charge` shifts every AM1-BCC partial charge; a REMD
+ladder with 50 K gaps lands far below the 15-50% acceptance window;
+MMPBSA on an implicit-only prmtop is wrong physics), and re-asking
+the user something the prompt or input file already names.
+
+When the answer is genuinely underdetermined, frame the question with
+the option you'd pick and the reason — e.g., *"8 replicas geometric
+300-400 K gives ~12 K gaps, which should land inside the 15-50%
+acceptance window; keep that or hand-tune?"* — beats a blank "what
+ladder?".
+
+### Ask the user to verify before recommending execution
+
+After choosing parameters, restate them in a short block and ask the
+user to confirm before suggesting they run anything. What to surface
+depends on the verb:
+
+**Single-replica MD (`amber_run.py --mode standard` / `amber_md.py`):**
+
+- Force field + water model (GAFF2 + TIP3P, etc.)
+- Net charge (silent-shift failure mode if wrong)
+- Engine (pmemd.cuda / pmemd / sander)
+- Buffer / box shape, salt conc if non-zero
+- Stage durations (heat ps, density ps, prod ns) and barostat
+- Restraints (mask + weight) if any
+- Output directory
+
+**T-REMD (`amber_remd.py` / `amber_run.py --mode remd`):**
+
+- N replicas + T-low / T-high + ladder shape
+- Exchange-every (steps) and total time per replica
+- MPI engine + launcher (`mpirun` vs `srun`)
+- Implicit-solvent flag if relevant
+- Expected acceptance window — flag if any pair-gap exceeds ~15 K
+  or if N replicas is below 4
+
+**Add-ons (`amber_score.py`, `amber_analyze.py`, `amber_sp.py`):**
+
+- MMPBSA: method (gb / pb / both), igb model, ionic strength, frame
+  range, MPI count
+- Analyze: which analyses (rmsd / rmsf / rdf / hbond / radgyr),
+  masks, reference frame
+- SP: mode (snapshot / trajectory), implicit-solvent flag if the
+  prmtop is GB
+
+Keep it tight — a 4-6 line summary, not a paragraph. If the user has
+already approved the plan, don't re-ask.
+
 ## Carve-out relationship with `ase-chemist`
 
 `ase-chemist` ships a v1.3 small-molecule Amber carve-out
@@ -105,6 +158,13 @@ When a user asks "what does `<keyword>` do?", check
 `mdin_keywords.md` first, fall back to `manual_lookup.md` for the
 Reference Manual section.
 
+**Smell test — don't fabricate.** If you are about to write *"I
+think `<keyword>` defaults to ..."* or *"the standard value for
+`<flag>` is roughly ..."*, stop and check the manual first.
+Hallucinated Amber semantics is a high-cost, hard-to-detect failure
+mode — pmemd often *runs* with the wrong value and produces
+plausible-looking output that misleads downstream analysis.
+
 ## Add-on extension surface
 
 When a new add-on is requested, follow the convention so the next
@@ -121,6 +181,24 @@ add-on lands predictably:
 shipped and which script each one would land in (aMD, SMD, umbrella
 sampling, MBAR, H-REMD, TI/FEP, constant-pH, QM/MM, membrane,
 PLUMED).
+
+## Reporting results
+
+When you finish a task, report:
+
+1. The pipeline used (prep + stages, or REMD config, or scoring deck)
+   and **why** it was chosen given system size, available engines,
+   and what the user asked for.
+2. Final numbers with units: trajectory length (ns), final temperature
+   / density / volume parsed from the last mdout, REMD per-pair
+   exchange acceptance rates (flag any outside [15%, 50%]), MMPBSA
+   `delta_total ± std-err` if scoring.
+3. Where outputs were written: prmtop / rst7 / `.nc` trajectory /
+   mdout / `exchange_rate.txt` / `<prefix>_summary.json`.
+4. Any caveats — e.g., "Berendsen for density only; prod ran with
+   Monte Carlo", "REMD acceptance was 18% on the highest pair —
+   borderline; consider one more replica", "MMPBSA GB-only — PB is
+   ~2× slower but more defensible for publication".
 
 ## Honest deferrals
 
