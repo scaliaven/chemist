@@ -59,6 +59,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import _amber  # noqa: E402
+from _amber import GB_MAP  # noqa: E402
 
 
 def main() -> int:
@@ -91,7 +92,7 @@ def main() -> int:
     p.add_argument("--cut", type=float, default=10.0)
     p.add_argument("--gamma-ln", type=float, default=2.0)
     p.add_argument("--implicit-solvent", default="off",
-                   choices=["off", "gb1", "gb2", "gb5", "gb7", "gb8"])
+                   choices=list(GB_MAP))
     p.add_argument("--engine", default=None,
                    help="MPI engine override (pmemd.cuda.MPI / pmemd.MPI / sander.MPI).")
     p.add_argument("--mpiexec", default="mpirun",
@@ -162,8 +163,7 @@ def main() -> int:
     else:
         engine = _amber.pick_engine(args.engine, need_mpi=True)
         engine_note = ""
-    implicit_gb = {"off": 0, "gb1": 1, "gb2": 2,
-                   "gb5": 5, "gb7": 7, "gb8": 8}[args.implicit_solvent]
+    implicit_gb = GB_MAP[args.implicit_solvent]
 
     print(f"[remd] engine        : {engine}{engine_note}")
     print(f"[remd] mpiexec       : {args.mpiexec}")

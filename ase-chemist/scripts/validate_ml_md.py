@@ -61,29 +61,43 @@ def build_reference_calculator(name: str, *, xtb_method: str = "GFN2-xTB",
     )
 
 
-def validate_frame(atoms, reference_calc) -> tuple[float, float, float]:
-    """Recompute E/F with reference, compare to atoms.calc results.
+class Validator:
+    """Cross-validator that reuses a single `ref_atoms` across calls.
 
-    Returns (mae_e_mev, mae_f_mev_per_A, max_F_dev_mev_per_A).
-
-    Requires `atoms` to already have computed energies/forces on its
-    current calculator (e.g. inside an MD step).
+    Reusing the same Atoms object (and the same calculator attached to it)
+    lets TBLite restart from the previous SCF wavefunction instead of
+    cold-starting on each validation step. For the 1 ps-cadence cross-
+    validation contract in run_md.py, this halves the per-validation cost
+    on small organics.
     """
-    import numpy as np
 
-    ml_e = atoms.get_potential_energy()
-    ml_f = atoms.get_forces()
+    def __init__(self, reference_calc):
+        self.reference_calc = reference_calc
+        self._ref_atoms = None
 
-    ref_atoms = atoms.copy()
-    ref_atoms.calc = reference_calc
-    ref_e = ref_atoms.get_potential_energy()
-    ref_f = ref_atoms.get_forces()
+    def __call__(self, atoms) -> tuple[float, float, float]:
+        import numpy as np
 
-    mae_e_mev = abs(ml_e - ref_e) * 1000.0
-    f_diff = ml_f - ref_f
-    mae_f_mev = float(np.mean(np.linalg.norm(f_diff, axis=1))) * 1000.0
-    max_f_mev = float(np.max(np.linalg.norm(f_diff, axis=1))) * 1000.0
-    return mae_e_mev, mae_f_mev, max_f_mev
+        ml_e = atoms.get_potential_energy()
+        ml_f = atoms.get_forces()
+
+        if (self._ref_atoms is None
+                or len(self._ref_atoms) != len(atoms)
+                or (self._ref_atoms.numbers != atoms.numbers).any()):
+            self._ref_atoms = atoms.copy()
+            self._ref_atoms.calc = self.reference_calc
+        else:
+            self._ref_atoms.set_positions(atoms.get_positions())
+            self._ref_atoms.set_cell(atoms.get_cell())
+            self._ref_atoms.set_pbc(atoms.get_pbc())
+        ref_e = self._ref_atoms.get_potential_energy()
+        ref_f = self._ref_atoms.get_forces()
+
+        mae_e_mev = abs(ml_e - ref_e) * 1000.0
+        f_diff = ml_f - ref_f
+        mae_f_mev = float(np.mean(np.linalg.norm(f_diff, axis=1))) * 1000.0
+        max_f_mev = float(np.max(np.linalg.norm(f_diff, axis=1))) * 1000.0
+        return mae_e_mev, mae_f_mev, max_f_mev
 
 
 def main() -> int:
@@ -123,6 +137,7 @@ def main() -> int:
         args.reference, xtb_method=args.xtb_method,
         charge=args.charge, multiplicity=args.multiplicity,
     )
+    validator = Validator(ref)
 
     out_path = Path(args.output)
     breach: Optional[ValidationFailed] = None
@@ -137,7 +152,7 @@ def main() -> int:
             if i % args.stride != 0:
                 continue
             try:
-                mae_e, mae_f, max_f = validate_frame(atoms, ref)
+                mae_e, mae_f, max_f = validator(atoms)
             except Exception as e:
                 print(f"[validate] frame {i}: error ({e}); skipping.")
                 continue
@@ -168,8 +183,8 @@ def main() -> int:
 
 __all__ = [
     "ValidationFailed",
+    "Validator",
     "build_reference_calculator",
-    "validate_frame",
 ]
 
 

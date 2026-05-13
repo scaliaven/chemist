@@ -12,9 +12,10 @@ field on an unusual log it fails silently (returns empty dict / None)
 rather than raising — callers should check the return value.
 
 Public API:
-    parse_thermochem(log_path)       -> dict   (vib_freqs, ZPE, H, G, ...)
-    parse_mulliken_charges(log_path) -> list[float] | None
-    parse_homo_lumo(log_path)        -> (HOMO_eV, LUMO_eV) | None
+    load_log(log_path)               -> str  (read once, pass below)
+    parse_thermochem(text)           -> dict   (vib_freqs, ZPE, H, G, ...)
+    parse_mulliken_charges(text)     -> list[float] | None
+    parse_homo_lumo(text)            -> (HOMO_eV, LUMO_eV) | None
 """
 
 from __future__ import annotations
@@ -27,9 +28,12 @@ from typing import Optional
 HARTREE_EV = 27.211386245988
 
 
-def parse_thermochem(log_path: Path | str) -> dict:
-    """Extract vibrational frequencies and thermochemistry from a
-    Gaussian Freq job's .log.
+def load_log(log_path: Path | str) -> str:
+    return Path(log_path).read_text()
+
+
+def parse_thermochem(text: str) -> dict:
+    """Extract vibrational frequencies and thermochemistry from Freq output.
 
     Returns a dict with the following keys (any may be absent if
     Gaussian didn't print the corresponding line):
@@ -44,11 +48,8 @@ def parse_thermochem(log_path: Path | str) -> dict:
 
     Returns an empty dict if no Freq output was found.
     """
-    text = Path(log_path).read_text()
     out: dict = {}
 
-    # Vibrational frequencies. Gaussian prints these in groups of three
-    # on " Frequencies --" lines.
     freqs: list[float] = []
     for m in re.finditer(r" Frequencies --\s+(.+)", text):
         freqs.extend(float(x) for x in m.group(1).split())
@@ -56,7 +57,6 @@ def parse_thermochem(log_path: Path | str) -> dict:
         out["vib_freqs"] = freqs
         out["n_imag"] = sum(1 for f in freqs if f < 0)
 
-    # ZPE / thermal corrections / sums (all in Hartree in the log).
     patterns = {
         "_zpe_corr_h":    r"Zero-point correction=\s+([-\d.]+)",
         "_thermal_e_h":   r"Thermal correction to Energy=\s+([-\d.]+)",
@@ -73,7 +73,6 @@ def parse_thermochem(log_path: Path | str) -> dict:
         if m:
             raw[key] = float(m.group(1))
 
-    # User-facing eV-converted values
     if "_zpe_corr_h" in raw:
         out["zpe_eV"] = raw["_zpe_corr_h"] * HARTREE_EV
     if "_sum_e_h_h" in raw:
@@ -83,7 +82,6 @@ def parse_thermochem(log_path: Path | str) -> dict:
     if "_sum_e_therm_h" in raw:
         out["thermal_E_eV"] = raw["_sum_e_therm_h"] * HARTREE_EV
 
-    # Temperature (Gaussian prints "Temperature  298.150  Kelvin")
     m = re.search(r"Temperature\s+([\d.]+)\s*Kelvin", text)
     if m:
         out["temperature_K"] = float(m.group(1))
@@ -91,18 +89,10 @@ def parse_thermochem(log_path: Path | str) -> dict:
     return out
 
 
-def parse_mulliken_charges(log_path: Path | str) -> Optional[list[float]]:
+def parse_mulliken_charges(text: str) -> Optional[list[float]]:
     """Return Mulliken charges per atom from the most recent
     ' Mulliken charges:' block, or None if no block is found.
     """
-    text = Path(log_path).read_text()
-    # The block format is:
-    #   Mulliken charges:
-    #                  1
-    #       1  C   -0.123456
-    #       2  H    0.234567
-    #       ...
-    #    Sum of Mulliken charges = ...
     blocks = re.findall(
         r" Mulliken charges:\s*\n[^\n]*\n((?:[^\n]+\n)+?)\s+Sum of Mulliken",
         text,
@@ -113,7 +103,6 @@ def parse_mulliken_charges(log_path: Path | str) -> Optional[list[float]]:
     charges: list[float] = []
     for line in last.strip().splitlines():
         parts = line.split()
-        # Expect "  1  C   -0.123456"; last column is the charge.
         if len(parts) >= 3:
             try:
                 charges.append(float(parts[-1]))
@@ -122,18 +111,13 @@ def parse_mulliken_charges(log_path: Path | str) -> Optional[list[float]]:
     return charges if charges else None
 
 
-def parse_homo_lumo(log_path: Path | str) -> Optional[tuple[float, float]]:
+def parse_homo_lumo(text: str) -> Optional[tuple[float, float]]:
     """Return (HOMO_eV, LUMO_eV) from alpha-spin eigenvalues.
-
-    Walks the " Alpha  occ. eigenvalues --" and " Alpha virt. eigenvalues
-    --" lines (Hartree) and returns the last occupied + first virtual,
-    converted to eV.
 
     Returns None if the eigenvalues aren't printed in the log (Gaussian
     truncates default output for some methods; pass `Pop=Reg` via
     --extra-route to force the full eigenvalue list).
     """
-    text = Path(log_path).read_text()
     occ_eigs: list[float] = []
     virt_eigs: list[float] = []
     for line in text.splitlines():
@@ -155,6 +139,7 @@ def parse_homo_lumo(log_path: Path | str) -> Optional[tuple[float, float]]:
 
 __all__ = [
     "HARTREE_EV",
+    "load_log",
     "parse_thermochem",
     "parse_mulliken_charges",
     "parse_homo_lumo",

@@ -23,30 +23,37 @@ python scripts/check_env.py
 ```
 
 The output ends with a `[SUMMARY]` line that names exactly which
-workflows your environment supports right now. Recommend a path that
-the environment can run today; if the user is asking for REMD on a
-box without `pmemd.cuda.MPI`, say so and offer single-replica MD as
-the fallback.
+workflows your environment supports right now.
+
+**Environment-driven fallback strategy:**
+1. Parse the `[SUMMARY]` to determine available engines (pmemd.cuda, pmemd.cuda.MPI, pmemd, sander, etc.).
+2. If the user requests REMD but only single-replica engines are available, always recommend single-replica MD as the fallback.
+3. If the user requests implicit-solvent MD but only explicit-solvent libraries are present, report the gap clearly.
+4. Recommend the strongest path that the environment can run today; do not fabricate workarounds.
 
 ## MD-core method selection
 
 | Task | Tool | Notes |
 |---|---|---|
 | One-shot pipeline (prep + min + heat + density + prod) | `scripts/amber_run.py` | Default mode `standard`. `--time 1ns` style. Use `--from-prmtop` to skip prep when the user has a CHARMM-GUI prmtop. |
-| One-shot REMD pipeline | `scripts/amber_run.py --mode remd` | Chains prep + min + heat + density + REMD-prod. `--n-replicas`, `--t-low`, `--t-high`, `--exchange-every`. |
+| One-shot REMD pipeline | `scripts/amber_run.py --mode remd` | Chains prep + min + heat + density + REMD-prod. `--n-replicas`, `--t-low`, `--t-high`, `--exchange-every`. **Requires `.MPI` engine.** |
 | One-shot implicit-solvent MD | `scripts/amber_run.py --mode implicit` | Skips solvateBox; skips density (no PBC). `--implicit-gb gb2`. |
 | GAFF2 prep alone (small organic) | `scripts/amber_prep.py` | antechamber AM1-BCC → parmchk2 → tleap. `--water`, `--buffer`, `--box-shape oct`, `--salt-conc`. |
 | Stage-level MD control | `scripts/amber_md.py --stage {min,heat,density,prod,custom}` | Per-stage flags: `--restraint-mask`, `--barostat monte_carlo`, `--implicit-solvent gb2`, `--mdin <file>` (escape hatch). |
 | Restart from a previous stage | `scripts/amber_md.py --restart` | `irest=1, ntx=5`. Used for chaining heat→density→prod. |
 | Extend an existing prod by N more ps | `scripts/amber_md.py --extend` | Auto-numbers `prod_2.{nc,rst7,mdout}`, `_3`, etc. Works on the same stage. |
-| T-REMD (multi-replica enhanced sampling) | `scripts/amber_remd.py` | Auto temperature ladder, groupfile, exchange-rate report parsed from `rem.log`. MPI engine required. |
+| T-REMD (multi-replica enhanced sampling) | `scripts/amber_remd.py` | Auto temperature ladder, groupfile, exchange-rate report parsed from `rem.log`. **Requires `.MPI` engine.** |
+
+*Deep dive: `references/md_core.md` for stage rendering, restart vs extend, restraints, barostat options, and implicit-solvent (GB) MD.*
 
 ## Add-ons (consume MD output; not part of the MD core)
 
+*Framing: `references/add_ons.md` explains why add-ons consume MD output rather than acting as co-equal verbs, plus the extension-surface convention.*
+
 | Add-on | Tool | Notes |
 |---|---|---|
-| Single-point energy on a snapshot | `scripts/amber_sp.py --mode snapshot` | `imin=5, maxcyc=0` via pmemd; returns decomposed energy. |
-| Per-frame energy decomposition over a trajectory | `scripts/amber_sp.py --mode trajectory` | cpptraj `esander` action; returns per-frame totals + components. |
+| Single-point energy on a snapshot | `scripts/amber_sp.py --mode snapshot` | `imin=5, maxcyc=0` via pmemd; returns decomposed energy. See `references/single_point.md` for the snapshot-vs-trajectory trade-off. |
+| Per-frame energy decomposition over a trajectory | `scripts/amber_sp.py --mode trajectory` | cpptraj `esander` action; returns per-frame totals + components. See `references/single_point.md`. |
 | RMSD / RMSF / RDF / hbond / radgyr | `scripts/amber_analyze.py` | cpptraj-driven; CSV + PNG per analysis. `--demux-remd --remd-dir <dir>` to demux a finished REMD into per-temperature trajectories. |
 | Endpoint binding free energy (MMPBSA / MMGBSA) | `scripts/amber_score.py` | `--method gb|pb|both`, `--per-residue`, `--alanine-scan`, `--mpi N`. |
 
@@ -62,6 +69,8 @@ acids, complexes) lands in v1.1. When the user asks for protein MD,
 say so honestly: this skill ships GAFF2-only today; ff19SB+OPC and
 OL21 are deferred. See `references/extension_map.md` for where each
 deferred feature would land.
+
+*Deep dive: `references/force_fields.md` for GAFF2/AM1-BCC details, supported water models (TIP3P / OPC / SPCE / TIP4P-Ew), and the deferred biopolymer set (ff19SB, OL21, LIPID17).*
 
 ## Engine selection
 
@@ -202,9 +211,12 @@ When you finish a task, report:
 
 ## Honest deferrals
 
-When the user asks for something this skill does not ship, say so
-plainly and point at `references/extension_map.md`. Do not silently
-fabricate workflows. Specifically deferred in v1.0:
+When the user asks for something this skill does not ship, point at
+`references/extension_map.md` rather than fabricating a workflow. For
+things this skill DOES ship but where the user is hitting trouble,
+check `references/failure_modes.md` first — it catalogs known failure
+modes across prep / MD / REMD / analysis / scoring with recovery
+recipes. Specifically deferred in v1.0:
 
 - **Free energy** (TI / FEP / MBAR) — `amber_fep.py` / `amber_mbar.py` would land here.
 - **Enhanced sampling other than T-REMD** — aMD, SMD, umbrella, metadynamics — mostly mdin-flag changes; `amber_md.py --boost {amd,smd,umbrella}` is the planned shape.

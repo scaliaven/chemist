@@ -35,8 +35,9 @@ Output:
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
+
+from _calc import build_calculator
 
 HARTREE_EV = 27.211386245988
 
@@ -85,47 +86,12 @@ def main() -> int:
     print(f"[INFO] structure={args.structure} frame={args.frame} atoms={n}")
     print(f"[INFO] formula={atoms.get_chemical_formula()}")
 
-    if args.calculator == "emt":
-        from ase.calculators.emt import EMT
-        atoms.calc = EMT()
-    elif args.calculator == "lj":
-        from ase.calculators.lj import LennardJones
-        kwargs = {}
-        if args.epsilon is not None:
-            kwargs["epsilon"] = args.epsilon
-        if args.sigma is not None:
-            kwargs["sigma"] = args.sigma
-        if args.rc is not None:
-            kwargs["rc"] = args.rc
-        elif args.sigma is not None:
-            kwargs["rc"] = 3.0 * args.sigma
-        if kwargs:
-            eps_s = f"{kwargs.get('epsilon', 1.0):.4g} eV"
-            sig_s = f"{kwargs.get('sigma', 1.0):.4g} Å"
-            rc_s = (f"{kwargs['rc']:.4g} Å" if "rc" in kwargs
-                    else "ASE default")
-            print(f"[lj] ε={eps_s}  σ={sig_s}  rc={rc_s}")
-        else:
-            print("[lj] reduced units (ε=1, σ=1) — toy parameters; "
-                  "for real noble gases pass --epsilon/--sigma "
-                  "(see references/ase_core.md §LJ parameters)")
-        atoms.calc = LennardJones(**kwargs)
-    elif args.calculator == "tip3p":
-        from ase.calculators.tip3p import TIP3P
-        atoms.calc = TIP3P()
-    elif args.calculator == "xtb":
-        try:
-            from tblite.ase import TBLite
-        except ImportError as e:
-            raise SystemExit(
-                f"tblite calculator unavailable: {e}\n"
-                "Run scripts/check_env.py to diagnose. On HPC/conda systems "
-                "prefer `conda install -c conda-forge tblite-python`."
-            ) from e
-        atoms.calc = TBLite(method=args.xtb_method, charge=args.charge,
-                            multiplicity=args.multiplicity, verbosity=0)
+    atoms.calc = build_calculator(
+        args.calculator, atoms=atoms, xtb_method=args.xtb_method,
+        charge=args.charge, multiplicity=args.multiplicity,
+        lj_epsilon=args.epsilon, lj_sigma=args.sigma, lj_rc=args.rc,
+    )
 
-    # Force evaluation populates calc.results
     energy = atoms.get_potential_energy()
     forces = atoms.get_forces()
     fmax = float((forces ** 2).sum(axis=1).max() ** 0.5)

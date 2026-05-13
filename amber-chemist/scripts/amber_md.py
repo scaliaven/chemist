@@ -63,9 +63,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import _amber  # noqa: E402
-
-
-GB_MAP = {"off": 0, "gb1": 1, "gb2": 2, "gb5": 5, "gb7": 7, "gb8": 8}
+from _amber import GB_MAP  # noqa: E402
 
 
 def find_extend_target(out_dir: Path, prefix: str) -> tuple[Path, str]:

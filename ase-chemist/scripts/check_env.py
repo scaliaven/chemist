@@ -199,10 +199,12 @@ def main() -> int:
         lines.append("[MISSING] numpy")
 
     # xTB — three separate paths, reported separately
+    tblite_error = _probe_tblite_ase() if tblite_version else None
+    tblite_works = bool(tblite_version) and tblite_error is None
+
     if tblite_version:
         # tblite/__init__.py loads even when the C extension is broken;
         # probe the calculator import so we don't lie about usability.
-        tblite_error = _probe_tblite_ase()
         if tblite_error is None:
             lines.append(
                 f"[OK] tblite (Python) {tblite_version} — primary xTB path "
@@ -361,7 +363,6 @@ def main() -> int:
         )
 
     # Capability summary — only count tblite if its C extension actually loads.
-    tblite_works = bool(tblite_version) and _probe_tblite_ase() is None
     capabilities: list[str] = []
     if ase_version:
         # Always available with ASE

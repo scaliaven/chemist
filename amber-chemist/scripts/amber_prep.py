@@ -37,37 +37,11 @@ Examples:
 from __future__ import annotations
 
 import argparse
-import shutil
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import _amber  # noqa: E402
-
-
-REQUIRED_BINARIES = ("antechamber", "parmchk2", "tleap")
-
-
-def check_binaries() -> None:
-    missing = [b for b in REQUIRED_BINARIES if shutil.which(b) is None]
-    if missing:
-        raise SystemExit(
-            f"AmberTools binaries missing from PATH: {', '.join(missing)}\n"
-            "Install AmberTools (free): https://ambermd.org/GetAmber.php\n"
-            "Run scripts/check_env.py to see broader detection status."
-        )
-
-
-def infer_input_format(path: Path, override: str | None) -> str:
-    if override:
-        return override
-    suffix = path.suffix.lower().lstrip(".")
-    if suffix in ("pdb", "mol2", "sdf", "mol", "xyz"):
-        return suffix
-    raise SystemExit(
-        f"Cannot infer input format from extension '{path.suffix}'. "
-        f"Pass --input-format explicitly (pdb, mol2, sdf, mol, xyz)."
-    )
 
 
 def main() -> int:
@@ -142,7 +116,7 @@ def main() -> int:
             "references/extension_map.md."
         )
 
-    check_binaries()
+    _amber.require_binaries(_amber.PREP_BINARIES)
 
     src = Path(args.structure).resolve()
     if not src.exists():
@@ -151,7 +125,7 @@ def main() -> int:
     out_dir = Path(args.output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    fmt = infer_input_format(src, args.input_format)
+    fmt = _amber.infer_input_format(src, args.input_format)
     prefix = args.output_prefix
     mol2 = out_dir / f"{prefix}.mol2"
     frcmod = out_dir / f"{prefix}.frcmod"

@@ -108,8 +108,9 @@ def build_deck(args, deck_path: Path, dat_outputs: dict[str, Path]) -> None:
         if not args.rdf_pair:
             raise SystemExit("rdf analysis needs --rdf-pair MASK1 MASK2.")
         m1, m2 = args.rdf_pair
+        bin_spacing = args.rdf_rmax / args.rdf_nbins
         lines.append(
-            f"rdf out {dat_outputs['rdf']} 0.1 {args.rdf_rmax} "
+            f"rdf out {dat_outputs['rdf']} {bin_spacing:g} {args.rdf_rmax} "
             f"{m1} {m2}"
         )
     if "radgyr" in args.analyses:
