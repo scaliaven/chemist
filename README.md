@@ -53,7 +53,7 @@ fails loudly rather than silently chunk-mismatching):
    a small in-house regex helper (`scripts/_gaussian_log.py`,
    stdlib-only) — not a third-party parser. The one exception (Amber
    MD running natively in pmemd) is explicitly flagged in
-   `references/amber_carveout.md` and under review.
+   `ase-chemist/references/amber.md` §1 and under review.
 
 3. **Honest about limits.** xTB MD stops at ~1k atoms. MACE-medium
    tops out around 1–2k atoms on a 40 GB GPU. ASE's `Amber` calculator
@@ -89,7 +89,7 @@ chemist/
 │   ├── SKILL.md                       # trigger contract + method-selection tree
 │   ├── README.md                      # user-facing README
 │   ├── scripts/                       # 12 scripts (optimize, run_md, gaussian_*, …)
-│   ├── references/                    # 17 small scoped reference files
+│   ├── references/                    # 15 small scoped reference files
 │   └── evals/evals.json               # 5 prompts for manual review
 ├── amber-chemist/                     # skill #2 dev source — edit here
 │   ├── SKILL.md                       # trigger contract + method-selection tree
@@ -213,11 +213,12 @@ no programmatic assertions; that's [v2.0](PLAN.md)'s job.
   contract (description field), method-selection tree, scripts
   catalog. Editing the description field regresses or improves
   activation; treat it as load-bearing.
-- [`ase-chemist/references/`](ase-chemist/references/) — 17 small
-  scoped reference files (1–4k chars each). The umbrella files
-  (`ml_potentials.md`, `amber.md`, `gaussian.md`) are thin indices
-  that point at sub-files for the specific topic — read only the
-  one that matches your task.
+- [`ase-chemist/references/`](ase-chemist/references/) — 15 small
+  scoped reference files (1–4k chars each). `ml_potentials.md` and
+  `gaussian.md` are thin indices pointing at sub-files; `amber.md`
+  is a single self-contained file (the v1.3 carve-out is small
+  enough not to need splitting, and deep Amber lives in the sibling
+  `amber-chemist` skill). Read only the file that matches your task.
 
 **`amber-chemist`:**
 
