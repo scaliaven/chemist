@@ -2,7 +2,8 @@
 
 Consolidated list of known issues across prep, MD, REMD, analysis,
 and scoring. Each entry has the symptom, the cause, and the fix.
-Superset of `ase-chemist/references/amber_failure_modes.md`.
+Superset of the v1.3 small-molecule failures listed in
+`ase-chemist/references/amber.md` §5.
 
 ## Prep (`amber_prep.py`)
 

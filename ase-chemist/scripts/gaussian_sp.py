@@ -54,11 +54,17 @@ from __future__ import annotations
 
 import argparse
 import shutil
-import sys
 from pathlib import Path
 
 
 HARTREE_EV = 27.211386245988
+
+
+def scrf_kwarg(solvation_model: str, solvent: str | None) -> str | None:
+    """Build the Gaussian `scrf=...` string from --solvation-model/--solvent."""
+    if not solvent:
+        return None
+    return f"({solvation_model.upper()},Solvent={solvent})"
 
 
 def detect_gaussian_binary(prefer: str | None = None) -> str:
@@ -95,15 +101,12 @@ def build_gaussian_calc(args, label: str, properties: list[str]):
         "mem": args.mem,
         "nprocshared": str(args.nproc),
     }
-    if args.solvent:
-        if args.solvation_model == "smd":
-            calc_kwargs["scrf"] = f"(SMD,Solvent={args.solvent})"
-        else:  # pcm
-            calc_kwargs["scrf"] = f"(PCM,Solvent={args.solvent})"
+    scrf = scrf_kwarg(args.solvation_model, args.solvent)
+    if scrf:
+        calc_kwargs["scrf"] = scrf
     if args.extra_route:
         calc_kwargs["extra"] = args.extra_route
     if "forces" in properties:
-        # request the analytical gradient
         calc_kwargs["force"] = ""
     return Gaussian(**calc_kwargs), binary
 
@@ -200,13 +203,14 @@ def main() -> int:
         print(f"[OK] dipole_e_A=[{d[0]:.4f},{d[1]:.4f},{d[2]:.4f}] "
               f"|d|={float(np.linalg.norm(d)):.4f}")
 
-    # Richer observables via the in-house Gaussian log parser
-    # (no cclib dep — keeps everything through ASE-or-our-own-code).
     log_path = Path(f"{args.label}.log")
     if log_path.exists():
         try:
-            from _gaussian_log import parse_mulliken_charges, parse_homo_lumo
-            charges = parse_mulliken_charges(log_path)
+            from _gaussian_log import (
+                load_log, parse_mulliken_charges, parse_homo_lumo,
+            )
+            log_text = load_log(log_path)
+            charges = parse_mulliken_charges(log_text)
             if charges is not None:
                 sym = atoms.get_chemical_symbols()
                 per_atom = ", ".join(
@@ -216,7 +220,7 @@ def main() -> int:
             else:
                 print("[INFO] Mulliken charges not found in log "
                       "(Gaussian default usually prints them; check the .log).")
-            hl = parse_homo_lumo(log_path)
+            hl = parse_homo_lumo(log_text)
             if hl is not None:
                 homo_eV, lumo_eV = hl
                 print(f"[OK] HOMO_eV={homo_eV:.4f}")

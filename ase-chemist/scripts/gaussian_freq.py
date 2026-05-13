@@ -42,12 +42,12 @@ Output:
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 from gaussian_sp import (
     add_common_gaussian_args,
     detect_gaussian_binary,
+    scrf_kwarg,
 )
 
 
@@ -72,7 +72,7 @@ def main() -> int:
                    help="Label for .com / .log files.")
     args = p.parse_args()
 
-    from _gaussian_log import parse_thermochem
+    from _gaussian_log import load_log, parse_thermochem
     from ase.calculators.gaussian import Gaussian
     from ase.io import read
 
@@ -107,11 +107,9 @@ def main() -> int:
         extra_route_parts.append(args.extra_route)
     calc_kwargs["extra"] = " ".join(extra_route_parts)
 
-    if args.solvent:
-        if args.solvation_model == "smd":
-            calc_kwargs["scrf"] = f"(SMD,Solvent={args.solvent})"
-        else:
-            calc_kwargs["scrf"] = f"(PCM,Solvent={args.solvent})"
+    scrf = scrf_kwarg(args.solvation_model, args.solvent)
+    if scrf:
+        calc_kwargs["scrf"] = scrf
 
     print(f"[INFO] Running Gaussian Freq job...")
     calc = Gaussian(**calc_kwargs)
@@ -122,7 +120,7 @@ def main() -> int:
     log_path = Path(f"{args.label}.log")
     if not log_path.exists():
         raise SystemExit(f"Expected Gaussian log at {log_path}, not found.")
-    thermo = parse_thermochem(log_path)
+    thermo = parse_thermochem(load_log(log_path))
 
     vibfreqs = thermo.get("vib_freqs")
     if not vibfreqs:

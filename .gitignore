@@ -27,6 +27,7 @@ test-inputs/
 # (Files under test-inputs/ and results/ are already covered above.)
 /*.traj
 /*.log
+/*.xyz
 /opt.log
 /md.log
 /vib.*

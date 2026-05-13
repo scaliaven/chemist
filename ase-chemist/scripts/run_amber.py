@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """Run Amber MD on a parameterized small-molecule system.
 
+FROZEN v1.3 SUBSET. The canonical Amber MD implementation lives at
+`amber-chemist/scripts/amber_run.py` + `amber_md.py` + `_amber.py`, which
+ships barostat options, restraints, implicit-GB blocks, restart, extend,
+and MPI engines that this file does NOT. Do not extend this file. If you
+need any of those features, use the amber-chemist skill instead. Bug
+fixes that apply to both should land in `_amber.py` first; only port
+back here if the carve-out is still desired.
+
+
 When to use:
     You have a `.prmtop` + `.rst7` pair (from `parameterize_gaff2.py`,
     or a user-supplied topology) and you want to run minimization,

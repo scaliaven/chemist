@@ -50,12 +50,12 @@ Output:
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
 from gaussian_sp import (  # local import; same scripts/ directory
     add_common_gaussian_args,
     detect_gaussian_binary,
+    scrf_kwarg,
 )
 
 
@@ -110,11 +110,9 @@ def main() -> int:
         "mem": args.mem,
         "nprocshared": str(args.nproc),
     }
-    if args.solvent:
-        if args.solvation_model == "smd":
-            calc_kwargs["scrf"] = f"(SMD,Solvent={args.solvent})"
-        else:
-            calc_kwargs["scrf"] = f"(PCM,Solvent={args.solvent})"
+    scrf = scrf_kwarg(args.solvation_model, args.solvent)
+    if scrf:
+        calc_kwargs["scrf"] = scrf
     if args.extra_route:
         calc_kwargs["extra"] = args.extra_route
 

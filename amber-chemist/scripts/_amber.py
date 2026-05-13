@@ -25,6 +25,36 @@ from typing import Iterable, Optional
 PLAIN_ENGINES = ("pmemd.cuda", "pmemd", "sander")
 MPI_ENGINES = ("pmemd.cuda.MPI", "pmemd.MPI", "sander.MPI")
 
+# Implicit Generalized Born model dispatch — shared by amber_md and amber_remd.
+GB_MAP = {"off": 0, "gb1": 1, "gb2": 2, "gb5": 5, "gb7": 7, "gb8": 8}
+
+# Prep-pipeline binaries required by amber_prep.py.
+PREP_BINARIES = ("antechamber", "parmchk2", "tleap")
+
+
+def require_binaries(names: Iterable[str]) -> None:
+    """Hard-fail if any of `names` is missing from PATH."""
+    missing = [b for b in names if shutil.which(b) is None]
+    if missing:
+        raise SystemExit(
+            f"AmberTools binaries missing from PATH: {', '.join(missing)}\n"
+            "Install AmberTools (free): https://ambermd.org/GetAmber.php\n"
+            "Run scripts/check_env.py to see broader detection status."
+        )
+
+
+def infer_input_format(path: Path, override: Optional[str] = None) -> str:
+    """Map a structure file's extension to an antechamber `-fi` format."""
+    if override:
+        return override
+    suffix = path.suffix.lower().lstrip(".")
+    if suffix in ("pdb", "mol2", "sdf", "mol", "xyz"):
+        return suffix
+    raise SystemExit(
+        f"Cannot infer input format from extension '{path.suffix}'. "
+        f"Pass --input-format explicitly (pdb, mol2, sdf, mol, xyz)."
+    )
+
 
 def pick_engine(preferred: Optional[str] = None, *, need_mpi: bool = False) -> str:
     """Return the first available Amber MD engine on PATH.
@@ -412,14 +442,22 @@ def parse_mdout(mdout: Path) -> dict:
 
 
 def mdout_succeeded(mdout: Path) -> bool:
-    """Heuristic: pmemd writes 'Total wall time' to mdout on clean exit."""
+    """Heuristic: pmemd writes 'Total wall time' to mdout on clean exit.
+
+    Production mdout files can be tens of MB on long runs; we only need
+    the closing banner, so tail-read the last 4 KB.
+    """
     if not mdout.exists():
         return False
     try:
-        text = mdout.read_text(errors="replace")
+        with mdout.open("rb") as fh:
+            fh.seek(0, 2)
+            size = fh.tell()
+            fh.seek(max(0, size - 4096))
+            tail = fh.read().decode("utf-8", errors="replace")
     except OSError:
         return False
-    return "Total wall time" in text
+    return "Total wall time" in tail
 
 
 _REMLOG_PAIR_RE = re.compile(

@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """Parameterize a small organic molecule with GAFF2 + AM1-BCC charges.
 
+FROZEN v1.3 SUBSET. The canonical prep implementation lives at
+`amber-chemist/scripts/amber_prep.py` + `_amber.py` (richer water-model
+set, salt-concentration handling, octahedral box, implicit-solvent prep,
+ff14SB/ff19SB/OL21 pre-wired hooks). Do not extend this file. If you
+need any of those features, use the amber-chemist skill instead.
+
+
 When to use:
     The user has a small organic molecule (≤ ~150 atoms; drug-like or
     cofactor-like) and needs to run explicit-solvent MD on it. This

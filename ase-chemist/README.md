@@ -122,8 +122,7 @@ eigenvalues) lives in a small in-house regex helper —
 `scripts/_gaussian_log.py`, ~100 lines of stdlib — not a third-party
 output parser. The one exception is Amber MD: pmemd runs the
 integration loop natively for performance reasons. That carve-out is
-explicitly flagged in `references/amber_carveout.md` and is under
-review.
+explicitly flagged in `references/amber.md` §1 and is under review.
 
 ### 3. Honest about limits
 
@@ -213,15 +212,16 @@ ase-chemist/
 ├── SKILL.md                  # trigger contract + method-selection tree
 ├── README.md                 # this file
 ├── scripts/                  # 12 scripts (one per task; see SKILL.md for the catalog)
-├── references/               # 17 scoped reference files; read on demand by topic
+├── references/               # 15 scoped reference files; read on demand by topic
 └── evals/                    # 5 prompts for manual review (programmatic assertions: iteration 2)
 ```
 
 References are intentionally small (1–4k chars each) so the model
 loads only the section relevant to the task — `ml_validation_contract.md`,
-`amber_carveout.md`, `gaussian_log_parser.md` etc., each navigable
-through the umbrella indices `ml_potentials.md` / `amber.md` /
-`gaussian.md`.
+`gaussian_log_parser.md` etc., navigable through the umbrella indices
+`ml_potentials.md` / `gaussian.md`. The Amber carve-out is small
+enough that `amber.md` is a single self-contained file (§1–§5) rather
+than an index.
 
 ---
 
@@ -267,11 +267,12 @@ workflows.
   successor to the deprecated `xtb-python`). If you upgrade either,
   re-run the evals manually and update the references.
 - Reference files are scoped (`ml_method_selection.md`,
-  `amber_carveout.md`, `gaussian_log_parser.md`, etc.) so the model
-  navigates to the topic it needs without reading the whole chapter.
-  Edit them as scoped files, not as one big chapter — the umbrella
-  indices (`ml_potentials.md` / `amber.md` / `gaussian.md`) just
-  point.
+  `gaussian_log_parser.md`, etc.) so the model navigates to the
+  topic it needs without reading the whole chapter. Edit them as
+  scoped files, not as one big chapter — the umbrella indices
+  (`ml_potentials.md` / `gaussian.md`) just point. `amber.md` is
+  self-contained (the v1.3 carve-out is small enough not to need
+  splitting).
 - The eval set has **no programmatic assertions** in v1. That's
   iteration 2's job — `PLAN.md` v2.0 milestones.
 - See `CLAUDE.md` at the repo root for the load-bearing design

@@ -36,19 +36,20 @@ chemist/
 ├── ase-chemist/                    # development source (edit here)
 │   ├── SKILL.md, README.md
 │   ├── scripts/
+│   │   ├── _calc.py                   # shared: build_calculator() factory used by optimize/run_md/single_point
 │   │   ├── check_env.py               # backends + CUDA + Amber detection, capability summary
-│   │   ├── optimize.py                # BFGS/FIRE/LBFGS; emt/lj/tip3p/xtb/mace
-│   │   ├── run_md.py                  # NVE/NVT; auto cross-validation w/ MACE
-│   │   ├── single_point.py            # E + dipole/charges/HOMO-LUMO via tblite
+│   │   ├── optimize.py                # BFGS/FIRE/LBFGS; emt/lj/tip3p/xtb/mace (delegates to _calc)
+│   │   ├── run_md.py                  # NVE/NVT; auto cross-validation w/ MACE (uses Validator from validate_ml_md)
+│   │   ├── single_point.py            # E + dipole/charges/HOMO-LUMO via tblite (delegates to _calc)
 │   │   ├── analyze_traj.py            # RMSD/RMSF/energy drift/RDF
 │   │   ├── ml_calculator.py           # v1.2 — MACE factory (element-set routing, GPU detect)
-│   │   ├── validate_ml_md.py          # v1.2 — post-hoc cross-validation vs GFN2-xTB
-│   │   ├── parameterize_gaff2.py      # v1.3 — antechamber AM1-BCC -> parmchk2 -> tleap
-│   │   ├── run_amber.py               # v1.3 — min/heat/density/prod via pmemd.cuda/pmemd/sander
-│   │   ├── gaussian_sp.py             # v1.4 — DFT SP via ase.calculators.gaussian.Gaussian
+│   │   ├── validate_ml_md.py          # v1.2 — Validator class (persistent ref_atoms; SCF restart between calls); post-hoc cross-validation vs GFN2-xTB
+│   │   ├── parameterize_gaff2.py      # v1.3 FROZEN SUBSET — antechamber AM1-BCC -> parmchk2 -> tleap (canonical at amber-chemist/scripts/amber_prep.py)
+│   │   ├── run_amber.py               # v1.3 FROZEN SUBSET — min/heat/density/prod via pmemd.cuda/pmemd/sander (canonical at amber-chemist/scripts/amber_md.py; amber_run.py is the easy-mode pipeline wrapper that also includes prep)
+│   │   ├── gaussian_sp.py             # v1.4 — DFT SP via ase.calculators.gaussian.Gaussian; also hosts shared helpers (add_common_gaussian_args, detect_gaussian_binary, scrf_kwarg) imported by gaussian_opt/freq
 │   │   ├── gaussian_opt.py            # v1.4 — DFT Opt via GaussianOptimizer (L103)
 │   │   ├── gaussian_freq.py           # v1.4 — DFT Freq + thermochem via in-house log parser
-│   │   └── _gaussian_log.py           # v1.4 — regex helper for Gaussian .log fields ASE doesn't cover
+│   │   └── _gaussian_log.py           # v1.4 — regex helper for Gaussian .log fields ASE doesn't cover. Parsers take pre-read text; use load_log() to read once and pass through
 │   ├── references/
 │   │   ├── ase_core.md, xtb.md, analysis.md           # v1 references
 │   │   ├── ml_potentials.md           # v1.2 reference — MACE method-selection + cross-validation contract
@@ -58,7 +59,7 @@ chemist/
 ├── amber-chemist/                      # development source for the second skill
 │   ├── SKILL.md, README.md
 │   ├── scripts/
-│   │   ├── _amber.py                  # shared: pick_engine, mdin renderers, parsers, groupfile
+│   │   ├── _amber.py                  # shared: pick_engine, mdin renderers, tleap deck factory, mdout/rem.log parsers, groupfile builder, GB_MAP, require_binaries, infer_input_format. mdout_succeeded tail-reads (4 KB) for large mdouts
 │   │   ├── check_env.py               # AmberTools / MPI / cpptraj / MMPBSA / ParmEd detection
 │   │   ├── amber_run.py               # easy mode: --mode {standard, remd, implicit}
 │   │   ├── amber_prep.py              # GAFF2 prep (ff19SB/OL21 raise NotImplementedError in v1.0)
@@ -223,16 +224,17 @@ move the eval results, so know what you're changing:
 - **Inline ASE code is fine when it's more honest than a script.** Don't add
   scripts for one-shot tasks (e.g., a 5-line single-point or a single
   `ase.build` call).
-- **`references/gaussian.md` is a v2.4 stub, not an implementation.** It
-  documents intended scope and detection logic for `check_env.py`, and it
-  explicitly tells the model not to generate Gaussian route lines or
-  `.gjf` decks from a skill response. Do not flesh it out into workflow
-  recipes without raising scope first — that decision is gated on
-  documented usage data, not a single prompt.
-  *(`amber.md` and `ml_potentials.md` were stubs in earlier drafts but
-  are now reference files for the v1.2/v1.3 implementations; they
-  describe shipping behavior, not future scope. Do not revert them to
-  stub framing.)*
+- **`amber.md`, `ml_potentials.md`, and `gaussian.md` describe shipping
+  implementations** (v1.3, v1.2, v1.4 respectively), not stubs. `ml_potentials.md`
+  and `gaussian.md` are indexes that link to topic-scoped siblings
+  (failure modes, method selection, force-field choices, etc.); `amber.md`
+  is a single self-contained file (§1–§5) because the v1.3 carve-out is
+  small enough not to need splitting, and the deep Amber surface lives in
+  the sibling `amber-chemist` skill. Do not revert any of them to stub
+  framing or flesh them out into workflow recipes beyond what the
+  implementation actually supports. Future scope (Gaussian TS/IRC/NBO/post-HF,
+  biopolymer Amber, ML potentials beyond MACE) is gated on `PLAN.md`
+  decisions, not single prompts.
 
 ## What's in vs. what's out
 
