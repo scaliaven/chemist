@@ -7,8 +7,8 @@ When to use:
                   Returns the decomposed energy terms (BOND, ANGLE,
                   DIHED, VDWAALS, EEL) the way pmemd reports them.
       trajectory  per-frame energies across a trajectory via cpptraj's
-                  esander action. Returns a CSV/JSON of per-frame
-                  totals + decomposition.
+                  esander action. Writes cpptraj's raw per-frame
+                  energy output to ``*_energies.dat``.
 
 When NOT to use:
     Endpoint binding free energy — that needs three trajectories
