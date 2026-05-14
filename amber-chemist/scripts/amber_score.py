@@ -51,7 +51,7 @@ def _render_deck(args) -> str:
     sections = [
         "&general",
         f"  startframe={args.start_frame}, "
-        + (f"endframe={args.end_frame}, " if args.end_frame else "")
+        + (f"endframe={args.end_frame}, " if args.end_frame is not None else "")
         + f"interval={args.stride}, keep_files={int(args.keep_files)},",
         "/",
     ]
