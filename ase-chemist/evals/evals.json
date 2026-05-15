@@ -1,5 +1,5 @@
 {
-  "skill": "ase-simulation",
+  "skill": "ase-chemist",
   "version": "v1",
   "schema_notes": "Each eval has id, prompt, expected_output (free-form prose for human review), and files (relative paths the eval depends on; empty for v1). v1 has NO programmatic assertions — that comes in iteration 2 once we know which behaviors are stable.",
   "evals": [

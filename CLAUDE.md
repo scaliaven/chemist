@@ -4,50 +4,117 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A development workspace for the **`ase-simulation` Agent Skill** (atomistic
-simulation orchestration on top of ASE / tblite-xTB / EMT / TIP3P). The repo
-contains the skill itself, a Layer B test harness that runs trigger / no-trigger
-prompts through `claude -p` in fresh sessions, and the input fixtures those
-prompts reference.
+A development workspace for **two sibling Agent Skills**:
+
+1. **`ase-chemist`** — atomistic simulation orchestration on top of
+   ASE / tblite-xTB / EMT / TIP3P, plus **MACE foundation models** in
+   v1.2+, a small **Amber GAFF2 small-molecule MD carve-out** in v1.3+
+   (plain `min → heat → density → prod` NPT only), and **Gaussian DFT
+   (SP / Opt / Freq)** in v1.4+.
+2. **`amber-chemist`** — Amber-native sibling skill, MD-first. Ships
+   single-replica MD (configurable stages, restart, extend, restraints,
+   barostat options, explicit or implicit GB solvent), **T-REMD** as a
+   v1.0 first-class capability, plus add-ons for cpptraj-driven
+   analysis (`amber_analyze.py`), single-point energies (`amber_sp.py`),
+   and MMPBSA endpoint scoring (`amber_score.py`). ff19SB/OL21
+   biopolymer prep is pre-wired and lands in v1.1.
+
+The repo contains both skills, a Layer B test harness that runs
+trigger / no-trigger prompts through `claude -p` in fresh sessions,
+and the input fixtures those prompts reference.
 
 This is **not** an application — there is no library to import and no service
-to run. Work here means editing the skill (SKILL.md, scripts, references) and
+to run. Work here means editing the skills (SKILL.md, scripts, references) and
 re-running the trigger tests to check whether changes regress activation or
-method-selection behavior.
+method-selection behavior. v2 phase sequencing for `ase-chemist` is tracked
+in `PLAN.md`.
 
 ## Layout — and the important duplication
 
 ```
-asechemist/
-├── ase-simulation/                    # development source (edit here)
+chemist/
+├── ase-chemist/                    # development source (edit here)
 │   ├── SKILL.md, README.md
-│   ├── scripts/    (check_env.py, optimize.py, run_md.py, single_point.py, analyze_traj.py)
-│   ├── references/ (ase_core.md, xtb.md, analysis.md;
-│   │                amber.md, gaussian.md, ml_potentials.md  ← v2 STUBS, not implementations)
+│   ├── scripts/
+│   │   ├── _calc.py                   # shared: build_calculator() factory used by optimize/run_md/single_point
+│   │   ├── check_env.py               # backends + CUDA + Amber detection, capability summary
+│   │   ├── optimize.py                # BFGS/FIRE/LBFGS; emt/lj/tip3p/xtb/mace (delegates to _calc)
+│   │   ├── run_md.py                  # NVE/NVT; auto cross-validation w/ MACE (uses Validator from validate_ml_md)
+│   │   ├── single_point.py            # E + dipole/charges/HOMO-LUMO via tblite (delegates to _calc)
+│   │   ├── analyze_traj.py            # RMSD/RMSF/energy drift/RDF
+│   │   ├── ml_calculator.py           # v1.2 — MACE factory (element-set routing, GPU detect)
+│   │   ├── validate_ml_md.py          # v1.2 — Validator class (persistent ref_atoms; SCF restart between calls); post-hoc cross-validation vs GFN2-xTB
+│   │   ├── parameterize_gaff2.py      # v1.3 FROZEN SUBSET — antechamber AM1-BCC -> parmchk2 -> tleap (canonical at amber-chemist/scripts/amber_prep.py)
+│   │   ├── run_amber.py               # v1.3 FROZEN SUBSET — min/heat/density/prod via pmemd.cuda/pmemd/sander (canonical at amber-chemist/scripts/amber_md.py; amber_run.py is the easy-mode pipeline wrapper that also includes prep)
+│   │   ├── gaussian_sp.py             # v1.4 — DFT SP via ase.calculators.gaussian.Gaussian; also hosts shared helpers (add_common_gaussian_args, detect_gaussian_binary, scrf_kwarg) imported by gaussian_opt/freq
+│   │   ├── gaussian_opt.py            # v1.4 — DFT Opt via GaussianOptimizer (L103)
+│   │   ├── gaussian_freq.py           # v1.4 — DFT Freq + thermochem via in-house log parser
+│   │   └── _gaussian_log.py           # v1.4 — regex helper for Gaussian .log fields ASE doesn't cover. Parsers take pre-read text; use load_log() to read once and pass through
+│   ├── references/
+│   │   ├── ase_core.md, xtb.md, analysis.md           # v1 references
+│   │   ├── ml_potentials.md           # v1.2 reference — MACE method-selection + cross-validation contract
+│   │   ├── amber.md                   # v1.3 reference — GAFF2 small-mol; protein/NA -> v2.3
+│   │   └── gaussian.md                # v1.4 reference — DFT SP/Opt/Freq; TS/IRC/NBO/post-HF -> v3+
 │   └── evals/evals.json               # 5 prompts; v1 has NO programmatic assertions
-├── .claude/skills/ase-simulation/     # project-scoped copy of the skill
+├── amber-chemist/                      # development source for the second skill
+│   ├── SKILL.md, README.md
+│   ├── scripts/
+│   │   ├── _amber.py                  # shared: pick_engine, mdin renderers, tleap deck factory, mdout/rem.log parsers, groupfile builder, GB_MAP, require_binaries, infer_input_format. mdout_succeeded tail-reads (4 KB) for large mdouts
+│   │   ├── check_env.py               # AmberTools / MPI / cpptraj / MMPBSA / ParmEd detection
+│   │   ├── amber_run.py               # easy mode: --mode {standard, remd, implicit}
+│   │   ├── amber_prep.py              # GAFF2 prep (ff19SB/OL21 raise NotImplementedError in v1.0)
+│   │   ├── amber_md.py                # MD core: stages, --restart, --extend, --implicit-solvent
+│   │   ├── amber_remd.py              # T-REMD with auto temperature ladder + exchange-rate report
+│   │   ├── amber_sp.py                # add-on: SP (snapshot or trajectory)
+│   │   ├── amber_analyze.py           # add-on: cpptraj-driven RMSD/RMSF/RDF/hbond/radgyr; --demux-remd
+│   │   └── amber_score.py             # add-on: MMPBSA / MMGBSA wrapper
+│   ├── references/                    # 15 topic-scoped files (md_core, remd, force_fields, ...)
+│   └── evals/evals.json               # 5 prompts, no programmatic assertions in v1.0
+├── .claude/skills/ase-chemist/     # project-scoped copy of ase-chemist
+├── .claude/skills/amber-chemist/       # project-scoped copy of amber-chemist
+├── PLAN.md                            # v2 phase sequencing for ase-chemist
 ├── test-inputs/                       # fixtures generated by generate_test.py
 ├── results/                           # per-run logs + .status from run_tests.sh
 ├── generate_test.py                   # one-shot fixture generator
-└── run_tests.sh                       # the test harness
+└── run_tests.sh                       # 14-prompt test harness (v1.0 -> v1.3)
 ```
 
-There are **three** copies of the skill on this machine:
+There are **three** copies of each skill on this machine. For
+`ase-chemist`:
 
-1. `ase-simulation/` (this repo, dev source)
-2. `.claude/skills/ase-simulation/` (project skill — Claude Code loads this when invoked from this repo)
-3. `~/.claude/skills/ase-simulation/` (user skill — currently identical to #2)
+1. `ase-chemist/` (this repo, dev source)
+2. `.claude/skills/ase-chemist/` (project skill — Claude Code loads this when invoked from this repo)
+3. `~/.claude/skills/ase-chemist/` (user skill — currently identical to #2)
 
-`#1` has drifted ahead of `#2`/`#3` (different `SKILL.md`, different scripts).
-Tests in `run_tests.sh` invoke `claude -p`, which loads `#2` or `#3` — **not**
-`#1`. After editing the dev source, sync it before re-running tests, e.g.:
+For `amber-chemist`:
+
+1. `amber-chemist/` (this repo, dev source)
+2. `.claude/skills/amber-chemist/` (project skill)
+3. `~/.claude/skills/amber-chemist/` (user skill)
+
+`#1` is the source of truth and may drift ahead of `#2`/`#3` between
+syncs. Tests in `run_tests.sh` invoke `claude -p`, which loads `#2` or
+`#3` — **not** `#1`. After editing the dev source, sync **both** loaded
+copies before re-running tests:
 
 ```bash
-rsync -a --delete ase-simulation/ .claude/skills/ase-simulation/
-# (and/or to ~/.claude/skills/ase-simulation/ if you want the user-level copy updated)
+# ase-chemist
+rsync -a --delete ase-chemist/ .claude/skills/ase-chemist/
+rsync -a --delete ase-chemist/ ~/.claude/skills/ase-chemist/
+diff -rq ase-chemist .claude/skills/ase-chemist     # confirm parity
+diff -rq ase-chemist ~/.claude/skills/ase-chemist
+
+# amber-chemist
+rsync -a --delete amber-chemist/ .claude/skills/amber-chemist/
+rsync -a --delete amber-chemist/ ~/.claude/skills/amber-chemist/
+diff -rq amber-chemist .claude/skills/amber-chemist
+diff -rq amber-chemist ~/.claude/skills/amber-chemist
 ```
 
-Confirm parity with `diff -rq ase-simulation .claude/skills/ase-simulation`.
+`PLAN.md` §"Sequencing rules" says wait until trigger tests pass against
+dev before syncing — but because the harness only sees the loaded copy,
+practically the order is "edit dev → sync → test → fix in dev → sync →
+test" until clean.
 
 ## Common commands
 
@@ -56,7 +123,7 @@ Confirm parity with `diff -rq ase-simulation .claude/skills/ase-simulation`.
 python generate_test.py
 
 # Sanity-check the simulation environment (calculators present, tblite loadable)
-python ase-simulation/scripts/check_env.py
+python ase-chemist/scripts/check_env.py
 
 # Run the full trigger-test suite (writes results/<id>.{log,status})
 bash run_tests.sh
@@ -76,14 +143,27 @@ The harness exits non-zero if any run timed out or errored; status values are
 
 ## How the test harness is structured
 
-`run_tests.sh` runs nine prompts, each in a fresh `claude -p` session with a
-180 s wall-clock cap. Prompts are tagged with one of three expected behaviors:
+`run_tests.sh` runs **fourteen** prompts, each in a fresh `claude -p`
+session with a 180 s wall-clock cap. Prompts are tagged with one of three
+expected behaviors:
 
 - `trigger` — the skill should activate and produce a correct ASE script.
 - `no_trigger` — generic prompts (boiling point of water, Python utility) that
   should **not** invoke the skill.
-- `borderline` — definitional questions ("explain NVT vs NPT") where either
-  triggering or not is defensible; logs are for human review.
+- `borderline` — definitional questions ("explain NVT vs NPT") or graceful-
+  deferral cases (protein MD on a v1.3 box that only ships GAFF2) where
+  either response is defensible; logs are for human review.
+
+Coverage groups:
+
+- **`p1`–`p5`** — v1.0/v1.1 baseline (xTB / EMT / LJ / TIP3P, build, analyze).
+- **`p10_mace_named`, `p11_size_cliff`** — v1.2 MACE foundation-model
+  trigger phrases and the size-cliff method-selection rule.
+- **`p12_gaff2_named`, `p13_antechamber`** — v1.3 GAFF2 / antechamber
+  trigger phrases and the new "production explicit-solvent MD" task entry.
+- **`p14_protein_md`** — v1.3 borderline; checks that the skill triggers
+  on protein MD but explains the v2.3 deferral honestly.
+- **`p6`–`p9`** — original no_trigger and borderline cases.
 
 The 180 s budget is intentionally too short to actually run a simulation — the
 test asks "did Claude write the right code?", not "did the code finish?". All
@@ -106,38 +186,103 @@ move the eval results, so know what you're changing:
 - **Method selection is a 3-step walk** (task → calculator → install check),
   with explicit "why" reasons per rule. EMT for EMT-supported metals, TIP3P
   for pure water, GFN2-xTB for organics / main-group, GFN1-xTB as the d-block
-  fallback. **Never silently substitute a wrong-physics calculator** (the
-  classic failure mode is EMT on an organic — it returns plausible nonsense).
+  fallback, **MACE past the xTB size cliff (~1k atoms)**, and **GAFF2 +
+  AM1-BCC for production-length explicit-solvent MD on a single small
+  organic** (v1.3+). **Never silently substitute a wrong-physics calculator**
+  (the classic failure mode is EMT on an organic — it returns plausible
+  nonsense).
 - **`tblite` is the supported xTB path**; `xtb-python` is deprecated. The
   pip wheel is libgfortran-fragile on HPC — `check_env.py` reports `[BROKEN]`
   in that case and the install hint is `conda install -c conda-forge
   tblite-python`.
+- **The MACE cross-validation contract is non-negotiable** (v1.2+).
+  `run_md.py --calculator mace` validates against GFN2-xTB every 1 ps
+  by default and aborts at `MAE_F > 100 meV/Å`. This is the basis on
+  which the skill recommends MACE at all — ML potentials produce
+  plausible-but-wrong PESs that users cannot spot. `--no-validate` is a
+  per-run choice, never a default. If you change the threshold or
+  cadence, document why in `references/ml_potentials.md` first.
+- **Amber uses shell-out, not ASE-Calculator** (v1.3+) — but this is a
+  performance choice, not forced. ASE ships **two** Amber calculators:
+  (1) `ase.calculators.amber.Amber` (FileIOCalculator, subprocess per
+  call — unusable for MD), and (2) `ase.calculators.amber.SANDER`
+  (pysander in-process bindings — works fine for ASE-driven MD via
+  `Langevin`/`VelocityVerlet`). v1.3 declined the SANDER path because
+  pysander binds only to CPU sander (no pmemd.cuda), giving up ~10–50×
+  throughput on production-sized systems. A fourth option exists and
+  is on the table: build a proper ASE Calculator around pmemd /
+  pmemd.cuda (long-lived subprocess wrapper, or contribute pmemd
+  Python bindings upstream) — gets both ASE-coherence and pmemd.cuda
+  speed, at the cost of real engineering work. If you're tempted to
+  "fix" the carve-out by switching to SANDER, read `references/
+  amber.md` §1 first — the trade is documented and the decision is
+  reviewable in `PLAN.md` §Phase 3, not load-bearing.
 - **The SKILL.md `description` field is the trigger contract.** It deliberately
   enumerates user phrases ("relax this molecule", "thermalize at 300 K", "build
-  a Pt(111) slab", etc.). If trigger reliability regresses, optimize that
-  field first.
+  a Pt(111) slab", "use MACE", "GAFF2 in water", "antechamber", etc.).
+  If trigger reliability regresses, optimize that field first.
 - **Inline ASE code is fine when it's more honest than a script.** Don't add
   scripts for one-shot tasks (e.g., a 5-line single-point or a single
   `ase.build` call).
-- **`references/amber.md`, `gaussian.md`, `ml_potentials.md` are v2 stubs,
-  not implementations.** They document intended v2 scope and detection
-  logic for `check_env.py`, and they explicitly tell the model not to
-  generate Amber input decks, Gaussian route lines, or ML-potential
-  calculator code from a skill response. Do not flesh these out into
-  workflow recipes without raising scope first — that decision is
-  gated on two weeks of real-usage data, not on a single prompt.
+- **`amber.md`, `ml_potentials.md`, and `gaussian.md` describe shipping
+  implementations** (v1.3, v1.2, v1.4 respectively), not stubs. `ml_potentials.md`
+  and `gaussian.md` are indexes that link to topic-scoped siblings
+  (failure modes, method selection, force-field choices, etc.); `amber.md`
+  is a single self-contained file (§1–§5) because the v1.3 carve-out is
+  small enough not to need splitting, and the deep Amber surface lives in
+  the sibling `amber-chemist` skill. Do not revert any of them to stub
+  framing or flesh them out into workflow recipes beyond what the
+  implementation actually supports. Future scope (Gaussian TS/IRC/NBO/post-HF,
+  biopolymer Amber, ML potentials beyond MACE) is gated on `PLAN.md`
+  decisions, not single prompts.
 
-## What's intentionally out of v1
+## What's in vs. what's out
 
-Don't add these without raising scope first: Amber / Gaussian / VASP / Quantum
-ESPRESSO backends, ML potentials (MACE / CHGNet / ORB), free-energy methods,
-solvation beyond TIP3P clusters, SLURM/HPC submission helpers, a turnkey NEB
-script. These are listed for v2 in `ase-simulation/README.md`.
+What v1.x ships today:
 
-For Amber, Gaussian, and ML potentials specifically, the v2 surface area
-is documented in stub reference files (`references/amber.md`,
-`references/gaussian.md`, `references/ml_potentials.md`) — each with a
-§3 "scope when implemented" list and a §4 "open questions" list that
-real-usage data is meant to answer. `scripts/check_env.py` reports
-detection status for these backends in a `[v2 preview]` block so users
-see what is on their box without the skill pretending to drive it.
+- **v1.0/v1.1** — ASE built-ins (EMT, LJ, TIP3P), tblite (GFN1/GFN2-xTB),
+  optimization / MD / single-point / trajectory analysis, structure
+  building. `scripts/single_point.py`, `scripts/optimize.py`,
+  `scripts/run_md.py`, `scripts/analyze_traj.py`.
+- **v1.2** — MACE-MP-0 (89-element materials) and MACE-OFF (10-element
+  organics) foundation models with element-set auto-routing and the
+  cross-validation contract (above). `scripts/ml_calculator.py`,
+  `scripts/validate_ml_md.py`.
+- **v1.3** — Amber GAFF2 small-molecule MD via the antechamber AM1-BCC
+  → parmchk2 → tleap → pmemd pipeline. `scripts/parameterize_gaff2.py`,
+  `scripts/run_amber.py`.
+- **v1.4** — Gaussian DFT SP / Opt / Freq through `ase.calculators.
+  gaussian.Gaussian`. No method/basis defaults; SMD as documented
+  water-solvent default; thermochem parsing via in-house
+  `scripts/_gaussian_log.py` helper (no third-party parser).
+  `scripts/gaussian_sp.py`, `scripts/gaussian_opt.py`,
+  `scripts/gaussian_freq.py`. **Goes through ASE** — no carve-out,
+  no cclib.
+
+What's deferred (do **not** add without raising scope first):
+
+- **v2.2+** — CHGNet (charge-aware materials), Orb-v3 (built-in
+  confidence head), committee-uncertainty heads on a frozen MACE backbone.
+  Documented in `references/ml_potentials.md` §6.
+- **v2.3** — Amber for biopolymers: ff19SB+OPC (proteins), OL21
+  (nucleic acids), full tleap-from-PDB system prep with pdb4amber and
+  disulfide handling. v1.3 ships only GAFF2; do not adapt the v1.3
+  `mdin` defaults for proteins.
+- **v3+** — Gaussian transition-state (`Opt=TS`, QST2/QST3, IRC),
+  anharmonic frequencies, NBO/NPA (NBO output has its own format
+  that needs its own parser), post-HF (CCSD/MP2/CASSCF), excited
+  states (TDDFT/CIS/EOM-CCSD). v1.4 ships
+  SP/Opt/Freq/SMD; the rest is out of scope per
+  `references/gaussian.md` §7.
+- **No v2 plan** — VASP, Quantum ESPRESSO (community CP2K / FHI-aims
+  bridges may land in v3), free-energy methods (TI / FEP / MBAR),
+  enhanced sampling (REMD, metadynamics, umbrella sampling), QM/MM,
+  constant-pH MD, RESP charges via Gaussian, SLURM/HPC submission
+  templates, web GUIs. These are listed in `ase-chemist/README.md`
+  and `PLAN.md` Phase 3.
+
+`scripts/check_env.py` reports detection status for v2.2+ ML potentials
+(CHGNet, M3GNet, SevenNet, Orb) in a `[v2 preview]` block so users see
+what is on their box without the skill pretending to drive it. Items
+previously in `[v2 preview]` (MACE, Amber, Gaussian) have been promoted
+to supported `[OK]`/`[MISSING]` lines.

@@ -30,59 +30,10 @@ Examples:
 from __future__ import annotations
 
 import argparse
-import sys
 import time
 from pathlib import Path
 
-
-def build_calculator(name: str, *, xtb_method: str = "GFN2-xTB",
-                     charge: int = 0, multiplicity: int = 1,
-                     lj_epsilon: float | None = None,
-                     lj_sigma: float | None = None,
-                     lj_rc: float | None = None):
-    if name == "emt":
-        from ase.calculators.emt import EMT
-        return EMT()
-    if name == "lj":
-        from ase.calculators.lj import LennardJones
-        kwargs = {}
-        if lj_epsilon is not None:
-            kwargs["epsilon"] = lj_epsilon
-        if lj_sigma is not None:
-            kwargs["sigma"] = lj_sigma
-        if lj_rc is not None:
-            kwargs["rc"] = lj_rc
-        elif lj_sigma is not None:
-            kwargs["rc"] = 3.0 * lj_sigma
-        if kwargs:
-            eps_s = f"{kwargs.get('epsilon', 1.0):.4g} eV"
-            sig_s = f"{kwargs.get('sigma', 1.0):.4g} Å"
-            rc_s = (f"{kwargs['rc']:.4g} Å" if "rc" in kwargs
-                    else "ASE default")
-            print(f"[lj] ε={eps_s}  σ={sig_s}  rc={rc_s}")
-        else:
-            print("[lj] reduced units (ε=1, σ=1) — toy parameters; "
-                  "for real noble gases pass --epsilon/--sigma "
-                  "(see references/ase_core.md §LJ parameters)")
-        return LennardJones(**kwargs)
-    if name == "tip3p":
-        from ase.calculators.tip3p import TIP3P
-        return TIP3P()
-    if name == "xtb":
-        try:
-            from tblite.ase import TBLite
-        except ImportError as e:
-            raise SystemExit(
-                f"tblite calculator unavailable: {e}\n"
-                "Run `scripts/check_env.py` to see whether tblite is missing "
-                "or installed-but-broken. On HPC/conda systems prefer "
-                "`conda install -c conda-forge tblite-python`; on a clean "
-                "pip environment, `pip install tblite`. Or pick a different "
-                "--calculator."
-            ) from e
-        return TBLite(method=xtb_method, charge=charge,
-                      multiplicity=multiplicity, verbosity=0)
-    raise SystemExit(f"Unknown calculator: {name}")
+from _calc import build_calculator
 
 
 def main() -> int:
@@ -90,17 +41,46 @@ def main() -> int:
         description="Run NVE / NVT MD with ASE.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         epilog=(
-            "Calculator: emt | lj | tip3p | xtb. "
+            "Calculator: emt | lj | tip3p | xtb | mace. "
             "Ensemble: nve (VelocityVerlet), nvt-langevin (default), "
-            "nvt-nose-hoover (deterministic NVT)."
+            "nvt-nose-hoover (deterministic NVT). "
+            "With --calculator mace, cross-validation against GFN2-xTB "
+            "is on by default (--validate-every 1.0 ps); --no-validate "
+            "to disable."
         ),
     )
     p.add_argument("--structure", required=True,
                    help="Input structure (xyz, cif, pdb, traj, ...).")
     p.add_argument("--calculator", required=True,
-                   choices=["emt", "lj", "tip3p", "xtb"])
+                   choices=["emt", "lj", "tip3p", "xtb", "mace"])
     p.add_argument("--xtb-method", default="GFN2-xTB",
                    choices=["GFN1-xTB", "GFN2-xTB"])
+    p.add_argument("--mace-system-class", default=None,
+                   choices=["organic", "materials"],
+                   help="Override MACE auto-routing.")
+    p.add_argument("--mace-device", default=None,
+                   choices=["cuda", "cpu"],
+                   help="Inference device for MACE. Default: auto-detect.")
+    p.add_argument("--mace-size", default="medium",
+                   choices=["small", "medium", "large"],
+                   help="MACE checkpoint size.")
+    p.add_argument("--validate-every", type=float, default=1.0,
+                   help="Cross-validation cadence in ps (mace only). "
+                        "Recomputes E/F at each checkpoint through the "
+                        "reference and writes validation.csv.")
+    p.add_argument("--no-validate", action="store_true",
+                   help="Disable cross-validation (mace only). Defaults "
+                        "to ON; the cross-validation contract is "
+                        "documented in references/ml_potentials.md.")
+    p.add_argument("--validation-reference", default="xtb",
+                   choices=["xtb"],
+                   help="Reference calculator for cross-validation.")
+    p.add_argument("--abort-mae-f", type=float, default=100.0,
+                   help="Abort MD when force MAE (meV/Å) exceeds this. "
+                        "Per references/ml_potentials.md cross-validation "
+                        "contract; 100 meV/Å is the published rule of thumb.")
+    p.add_argument("--validation-output", default="validation.csv",
+                   help="CSV path for cross-validation results.")
     p.add_argument("--charge", type=int, default=0)
     p.add_argument("--multiplicity", type=int, default=1)
     p.add_argument("--epsilon", type=float, default=None,
@@ -149,9 +129,11 @@ def main() -> int:
     atoms = read(args.structure)
     print(f"Loaded {len(atoms)} atoms from {args.structure}")
     atoms.calc = build_calculator(
-        args.calculator, xtb_method=args.xtb_method,
+        args.calculator, atoms=atoms, xtb_method=args.xtb_method,
         charge=args.charge, multiplicity=args.multiplicity,
         lj_epsilon=args.epsilon, lj_sigma=args.sigma, lj_rc=args.rc,
+        mace_system_class=args.mace_system_class,
+        mace_device=args.mace_device, mace_size=args.mace_size,
     )
 
     if not args.no_init_velocities:
@@ -194,6 +176,56 @@ def main() -> int:
         interval=args.log_interval,
     )
 
+    validation_handle = None
+    if args.calculator == "mace" and not args.no_validate:
+        from validate_ml_md import (
+            ValidationFailed, Validator, build_reference_calculator,
+        )
+        ref_calc = build_reference_calculator(
+            args.validation_reference, xtb_method=args.xtb_method,
+            charge=args.charge, multiplicity=args.multiplicity,
+        )
+        validator = Validator(ref_calc)
+        validate_steps = max(
+            1, int(round(args.validate_every * 1000.0 / args.timestep))
+        )
+        validation_csv = open(args.validation_output, "w", newline="")
+        import csv as _csv
+        validation_writer = _csv.writer(validation_csv)
+        validation_writer.writerow([
+            "step", "MAE_E_meV", "MAE_F_meV_per_A", "max_F_dev_meV_per_A",
+        ])
+        validation_csv.flush()
+
+        def _validate_callback():
+            step = dyn.get_number_of_steps()
+            mae_e, mae_f, max_f = validator(atoms)
+            validation_writer.writerow([
+                step, f"{mae_e:.3f}", f"{mae_f:.3f}", f"{max_f:.3f}",
+            ])
+            validation_csv.flush()
+            print(
+                f"[validate] step {step:6d}: |dE| = {mae_e:7.2f} meV   "
+                f"MAE_F = {mae_f:6.2f} meV/A   max |dF| = {max_f:6.2f} meV/A"
+            )
+            if mae_f > args.abort_mae_f:
+                raise ValidationFailed(step, mae_f, args.abort_mae_f)
+
+        dyn.attach(_validate_callback, interval=validate_steps)
+        validation_handle = (validation_csv, ValidationFailed)
+        print(
+            f"Validation     : every {args.validate_every} ps "
+            f"({validate_steps} steps) vs {args.validation_reference}, "
+            f"abort at MAE_F > {args.abort_mae_f} meV/Å"
+        )
+    elif args.calculator == "mace" and args.no_validate:
+        print(
+            "Validation     : DISABLED (--no-validate). The cross-"
+            "validation contract is the basis on which the skill "
+            "recommends MACE; opting out is a per-run choice, not a "
+            "default."
+        )
+
     print(f"Calculator     : {args.calculator}"
           + (f" ({args.xtb_method})" if args.calculator == 'xtb' else ""))
     print(f"Ensemble       : {args.ensemble}")
@@ -207,7 +239,19 @@ def main() -> int:
     e0 = atoms.get_potential_energy()
     print(f"Initial PE     : {e0:.4f} eV")
     t_start = time.time()
-    dyn.run(args.n_steps)
+    aborted_validation = None
+    try:
+        dyn.run(args.n_steps)
+    except Exception as e:
+        if (validation_handle is not None
+                and isinstance(e, validation_handle[1])):
+            aborted_validation = e
+            print(f"[validate] ABORT at step {e.frame}: {e}")
+        else:
+            raise
+    finally:
+        if validation_handle is not None:
+            validation_handle[0].close()
     t_elapsed = time.time() - t_start
     e1 = atoms.get_potential_energy()
     ke = atoms.get_kinetic_energy()
@@ -220,6 +264,14 @@ def main() -> int:
     print(f"Inst. T        : {T_inst:.1f} K (target {args.temperature} K)")
     print(f"Wall time      : {t_elapsed:.2f} s "
           f"({t_elapsed / args.n_steps * 1000:.2f} ms/step)")
+
+    if aborted_validation is not None:
+        print(
+            f"\nMD aborted by cross-validation. Trust the trajectory "
+            f"only up to step {aborted_validation.frame}. "
+            f"See {args.validation_output}."
+        )
+        return 3
 
     return 0
 
