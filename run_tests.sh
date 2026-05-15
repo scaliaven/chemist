@@ -8,10 +8,7 @@ OUT=results
 mkdir -p "$OUT"
 
 # Non-gating environment summary; helps interpret skill behavior in logs.
-# Prefer python3 to avoid Python 2 on systems where 'python' is missing or old.
-if command -v python3 >/dev/null 2>&1; then
-  python3 amber-chemist/scripts/check_env.py --summary-only > "$OUT/amber-chemist_env.txt" 2>&1 || true
-elif command -v python >/dev/null 2>&1; then
+if [ -x "$(command -v python)" ]; then
   python amber-chemist/scripts/check_env.py --summary-only > "$OUT/amber-chemist_env.txt" 2>&1 || true
 fi
 
@@ -119,6 +116,38 @@ run_one a11_remd_ladder     trigger     "I asked for T-REMD spanning 280-500 K w
 run_one a12_collision       trigger     "Run 1 ns of explicit-solvent MD on caffeine in TIP3P water using GAFF2. Starting structure: test-inputs/caffeine.xyz, net charge 0. Write the scripts; don't execute."
 run_one a13_amd_borderline  borderline  "Run accelerated MD (aMD) on this system. Does this skill handle it?"
 run_one a14_remd_no_mpi     borderline  "I want to run REMD but I only have non-MPI pmemd.cuda. What can this skill do?"
+
+# Real-world use cases. These prompts pose research questions in the
+# motivation-first phrasing a working chemist would actually use — often
+# without naming a method, sometimes describing a phenomenon ("is it
+# stable", "does it flip", "for my QSAR model"). They test whether the
+# skills route a goal to the right tool, pick a sensible method when none
+# is named, and disambiguate between siblings when both could plausibly
+# answer. Distinct from the trigger-phrase-style p1-a14 above.
+
+# ase-chemist — research goals that should route through ASE/Gaussian/xTB.
+run_one r1_conformer_rank   trigger     "For a paper I need relative DFT energies of three conformers of a drug-like molecule. I have them in conf_1.xyz, conf_2.xyz, conf_3.xyz. Recommend a level of theory and write the comparison script; don't execute."
+run_one r2_ir_predict       trigger     "Predict the IR spectrum of formic acid (HCOOH) so I can compare with our experimental measurement. Use B3LYP/6-31G(d) with SMD water. Don't execute."
+run_one r3_pt_co_ads        trigger     "I want the adsorption energy of CO on a Pt(111) top site for a catalysis project. Use a 3-layer 4x4 slab. Pick an appropriate calculator and write the script; don't execute."
+run_one r4_qsar_descriptors trigger     "I'm building a small QSAR model and need dipole moment, HOMO-LUMO gap, and partial charges for caffeine (test-inputs/caffeine.xyz). What's the fastest sensible level? Write the script; don't execute."
+run_one r5_solv_dG_smd      trigger     "Compute the solvation free energy of acetone in water via SMD at M06-2X/6-31+G(d,p). Don't execute."
+
+# amber-chemist — research goals that should route through Amber/cpptraj/MMPBSA.
+run_one r6_dock_rescore     trigger     "I have 5 docking poses for a kinase inhibitor (pose_1.prmtop through pose_5.prmtop with matching .rst7 files). Rescore them with MMGBSA so I can pick the best binder. Short prod is fine. Don't execute."
+run_one r7_hbond_lifetime   trigger     "I want the longest-lived hydrogen bonds between my ligand and water over a 200 ns trajectory in prod.nc with topology system.prmtop. Don't execute."
+run_one r8_ligand_stability trigger     "Is this drug stable in its starting conformation over 50 ns in water? I have drug.mol2 (net charge 0) and want to know whether the central dihedral flips. Don't execute."
+run_one r9_perres_decomp    trigger     "I want to know which residues at my protein-ligand interface contribute most to binding. I have complex/receptor/ligand prmtops and prod.nc. Don't execute."
+run_one r10_radgyr          trigger     "I'd like to track radius of gyration vs time for a flexible drug over a 100 ns prod.nc (topology system.prmtop) to see whether it collapses. Don't execute."
+
+# Cross-skill disambiguation — both skills could plausibly trigger.
+# rX1: small-mol explicit-solvent MD lives in BOTH ase-chemist (carve-out)
+#      and amber-chemist (canonical). Either response is defensible; the
+#      log is for human review of how each skill positions itself.
+# rX2: rigorous absolute binding free energy (FEP/TI/MBAR) is out of scope
+#      for both v1.x skills. Honest deferral is the right answer; MMPBSA
+#      as the available approximation is a reasonable redirect.
+run_one rX1_drug_in_water   borderline  "I want to understand how my drug moves around in water over a few nanoseconds. What's the right tool here? Don't execute."
+run_one rX2_fep_binding     borderline  "Compute the absolute binding free energy of my ligand to its protein target. Don't execute."
 
 # Quick summary so you know at a glance what to investigate.
 echo
