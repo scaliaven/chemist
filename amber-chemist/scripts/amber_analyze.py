@@ -171,8 +171,8 @@ def main() -> int:
     p.add_argument("--analyses", nargs="+",
                    default=["rmsd", "rmsf"],
                    choices=["rmsd", "rmsf", "rdf", "hbond", "radgyr"])
-    p.add_argument("--rmsd-mask", default="@CA,C,N|!@H=")
-    p.add_argument("--rmsf-mask", default="@CA,C,N|!@H=")
+    p.add_argument("--rmsd-mask", default="@CA,C,N&!@H=")
+    p.add_argument("--rmsf-mask", default="@CA,C,N&!@H=")
     p.add_argument("--rdf-pair", nargs=2, metavar=("MASK1", "MASK2"))
     p.add_argument("--rdf-rmax", type=float, default=10.0)
     p.add_argument("--rdf-nbins", type=int, default=200)
