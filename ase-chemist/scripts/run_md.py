@@ -136,11 +136,12 @@ def main() -> int:
         mace_device=args.mace_device, mace_size=args.mace_size,
     )
 
+    rng = None
+    if args.seed is not None:
+        import numpy as np
+        rng = np.random.default_rng(args.seed)
+
     if not args.no_init_velocities:
-        rng = None
-        if args.seed is not None:
-            import numpy as np
-            rng = np.random.default_rng(args.seed)
         MaxwellBoltzmannDistribution(
             atoms, temperature_K=args.temperature, rng=rng,
         )
@@ -156,7 +157,7 @@ def main() -> int:
             atoms, timestep=dt,
             temperature_K=args.temperature,
             friction=args.friction / units.fs,
-            rng=None,
+            rng=rng,
         )
     elif args.ensemble == "nvt-nose-hoover":
         from ase.md.nose_hoover_chain import NoseHooverChainNVT
