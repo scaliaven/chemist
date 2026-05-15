@@ -6,6 +6,7 @@
 > validation over *"just trust the ML potential."*
 
 `chemist` is the dev workspace for **two sibling Claude Code skills**:
+**Disclaimer**: this whole thing is still in development mode, so expect rough edges and vast changes. If you find any issues, please report them. I plan to write a third openmm-chemist skill eventually, but for now I'm focused on these two:
 
 - [**`ase-chemist`**](ase-chemist/) — atomistic / molecular simulation
   on top of ASE. Bundles seven backends (ASE built-ins, tblite-xTB,
@@ -241,3 +242,18 @@ no programmatic assertions; that's [v2.0](PLAN.md)'s job.
   Claude Code sessions working in this repo. The skill-copy
   duplication rules (now applied to **both** skills), the
   load-bearing carve-outs, the what-NOT-to-touch list.
+
+## Plans
+
+- **`openmm-chemist`** — eventual third sibling skill. No timeline yet;
+  listed here so it isn't forgotten.
+- **No plans for ORCA or Gromacs.** Both are free and arguably more
+  popular than what ships here, but I don't have the bandwidth and
+  wasn't familiar with either when I started. Rough guidance if you're
+  picking a tool for your own work:
+  - **MD / sampling** → OpenMM (or `amber-chemist` here, if you're
+    already in the AMBER ecosystem).
+  - **QM calculations** (geometry optimization, single points,
+    frequencies) → Gaussian (`ase-chemist` v1.4 drives it).
+  - **In between** — depends on system size vs. accuracy needed.
+    Small + high accuracy → Gaussian. Large + lower accuracy → OpenMM.
