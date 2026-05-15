@@ -100,6 +100,11 @@ def main() -> int:
     if n_frames < 2:
         print("Trajectory has fewer than 2 frames; skipping time-series analyses.")
         return 0
+    if not (-n_frames <= args.reference_frame < n_frames):
+        raise SystemExit(
+            f"--reference-frame {args.reference_frame} out of range for "
+            f"{n_frames} frames."
+        )
 
     # --- Stack positions
     positions = np.stack([f.positions for f in frames])  # (T, N, 3)

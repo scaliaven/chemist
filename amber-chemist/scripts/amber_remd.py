@@ -118,6 +118,10 @@ def main() -> int:
         if not rst.exists():
             raise SystemExit(f"input rst7 not found: {rst}")
 
+    if args.exchange_every <= 0:
+        raise SystemExit("--exchange-every must be a positive integer.")
+    if args.n_steps <= 0:
+        raise SystemExit("--n-steps must be a positive integer.")
     if args.exchange_every < 100:
         print(f"[remd] WARNING: --exchange-every={args.exchange_every} is "
               "unusually low; pmemd guidance is ~500-2000 steps between "

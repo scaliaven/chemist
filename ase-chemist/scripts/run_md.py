@@ -119,6 +119,14 @@ def main() -> int:
                    help="Skip Maxwell-Boltzmann velocity init (use velocities "
                         "already on the input structure).")
     args = p.parse_args()
+    if args.timestep <= 0:
+        raise SystemExit("--timestep must be > 0 fs.")
+    if args.n_steps <= 0:
+        raise SystemExit("--n-steps must be a positive integer.")
+    if args.log_interval <= 0:
+        raise SystemExit("--log-interval must be a positive integer.")
+    if args.validate_every <= 0:
+        raise SystemExit("--validate-every must be > 0 ps.")
 
     from ase import units
     from ase.io import read

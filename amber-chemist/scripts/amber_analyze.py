@@ -17,9 +17,8 @@ When NOT to use:
 
 REMD demux:
     --demux-remd --remd-dir <dir> consumes the output of amber_remd.py
-    and writes per-temperature trajectories `demux_TXXX.nc` via
-    cpptraj's `ensemble` keyword. Pair with --analyses to also run
-    standard analyses on each demuxed trajectory.
+    and writes a demultiplexed `demux.nc` via cpptraj's `ensemble`
+    keyword.
 
 Examples:
     python amber_analyze.py --prmtop sys.prmtop --trajectory prod.nc \\
@@ -126,7 +125,7 @@ def build_deck(args, deck_path: Path, dat_outputs: dict[str, Path]) -> None:
 
 
 def run_demux(args) -> int:
-    """Use cpptraj's `ensemble` keyword to demux a REMD ensemble."""
+    """Use cpptraj's `ensemble` keyword to write a demultiplexed trajectory."""
     remd_dir = Path(args.remd_dir).resolve()
     if not remd_dir.exists():
         raise SystemExit(f"--remd-dir not found: {remd_dir}")
