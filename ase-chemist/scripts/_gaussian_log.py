@@ -29,7 +29,7 @@ HARTREE_EV = 27.211386245988
 
 
 def load_log(log_path: Path | str) -> str:
-    return Path(log_path).read_text()
+    return Path(log_path).read_text(encoding="utf-8", errors="replace")
 
 
 def parse_thermochem(text: str) -> dict:

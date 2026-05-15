@@ -127,6 +127,8 @@ def main() -> int:
     p.add_argument("--output", default="validation.csv",
                    help="Output CSV path.")
     args = p.parse_args()
+    if args.stride <= 0:
+        raise SystemExit("--stride must be a positive integer.")
 
     from ase.io.trajectory import Trajectory
 
