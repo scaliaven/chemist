@@ -14,19 +14,35 @@ Part of the v1.4 Gaussian reference set. Companion files:
 fields ASE doesn't parse, v1.4 ships a small in-house helper:
 
 - `scripts/_gaussian_log.py` — ~100 lines of regex against Gaussian's
-  stable .log format. Three public functions:
+  stable .log format. Four public functions:
 
-  - `parse_thermochem(log_path)` — vibrational frequencies (cm⁻¹,
+  - `load_log(log_path)` — reads the .log file and returns the text
+    as a string. Call this once, then pass the text to the parsers
+    below.
+  - `parse_thermochem(text)` — vibrational frequencies (cm⁻¹,
     signed; negative values are imaginary modes), ZPE, enthalpy,
-    Gibbs free energy, thermochem temperature. Returns a dict;
-    keys absent if the corresponding line wasn't in the log.
-  - `parse_mulliken_charges(log_path)` — list of per-atom Mulliken
+    Gibbs free energy, thermochem temperature. Takes the log text
+    (str) returned by `load_log`. Returns a dict; keys absent if
+    the corresponding line wasn't in the log.
+  - `parse_mulliken_charges(text)` — list of per-atom Mulliken
     charges from the most recent `Mulliken charges:` block (Gaussian
-    prints these by default), or None if not found.
-  - `parse_homo_lumo(log_path)` — `(HOMO_eV, LUMO_eV)` from the
-    `Alpha occ./virt. eigenvalues` lines, or None. Gaussian
-    truncates default eigenvalue output for some methods; pass
-    `Pop=Reg` via `--extra-route` to force the full list.
+    prints these by default), or None if not found. Takes the log
+    text (str).
+  - `parse_homo_lumo(text)` — `(HOMO_eV, LUMO_eV)` from the
+    `Alpha occ./virt. eigenvalues` lines, or None. Takes the log
+    text (str). Gaussian truncates default eigenvalue output for
+    some methods; pass `Pop=Reg` via `--extra-route` to force the
+    full list.
+
+Usage pattern:
+
+```python
+from _gaussian_log import load_log, parse_thermochem, parse_mulliken_charges
+
+log_text = load_log("output.log")
+thermo = parse_thermochem(log_text)
+charges = parse_mulliken_charges(log_text)
+```
 
 Why in-house instead of cclib:
 
