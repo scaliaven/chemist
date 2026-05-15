@@ -139,7 +139,8 @@ def run_demux(args) -> int:
         raise SystemExit(f"No replica_*/prod.nc found under {remd_dir}.")
     deck = out_dir / "demux.cpptraj"
     # cpptraj's ensemble syntax: trajin <first> <last> <stride> ensemble <list>
-    others = " ".join(str(r) for r in replicas)
+    # Build the ensemble list so each replica appears exactly once
+    others = " ".join(str(r) for r in replicas[1:])
     deck.write_text(
         f"parm {prmtop}\n"
         f"ensemble {replicas[0]} {others}\n"
