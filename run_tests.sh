@@ -8,7 +8,10 @@ OUT=results
 mkdir -p "$OUT"
 
 # Non-gating environment summary; helps interpret skill behavior in logs.
-if [ -x "$(command -v python)" ]; then
+# Prefer python3 to avoid Python 2 on systems where 'python' is missing or old.
+if command -v python3 >/dev/null 2>&1; then
+  python3 amber-chemist/scripts/check_env.py --summary-only > "$OUT/amber-chemist_env.txt" 2>&1 || true
+elif command -v python >/dev/null 2>&1; then
   python amber-chemist/scripts/check_env.py --summary-only > "$OUT/amber-chemist_env.txt" 2>&1 || true
 fi
 
