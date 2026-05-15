@@ -106,6 +106,7 @@ def main_trajectory(args) -> int:
     deck.write_text(
         f"parm {prmtop}\n"
         f"trajin {traj} {frames}\n"
+        "autoimage\n"
         f"esander {prefix} out {out_dat}\n"
         "go\n"
         "quit\n"
