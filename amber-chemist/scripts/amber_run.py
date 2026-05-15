@@ -169,6 +169,10 @@ def main() -> int:
         )
         if skip_prep:
             print(f"[run] resume: prep already done ({prmtop.name}, {rst.name})")
+        elif args.dry_run:
+            print(f"[run] --dry-run: skipping prep (would write {prmtop.name}, "
+                  f"{rst.name}); downstream stages will dry-run with these "
+                  "paths even though they don't exist yet.")
         else:
             prep_args = [
                 "--structure", args.structure,
@@ -269,8 +273,6 @@ def main() -> int:
             remd_args += ["--temps", args.temps]
         if args.engine:
             remd_args += ["--engine", args.engine]
-        if args.mode == "implicit":
-            remd_args += ["--implicit-solvent", args.implicit_gb]
         rc = call_script("amber_remd.py", remd_args, dry_run=args.dry_run)
         if rc != 0:
             raise SystemExit(f"REMD prod failed (rc={rc}).")
