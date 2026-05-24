@@ -116,7 +116,7 @@ def main() -> int:
                         "this prmtop (-sp).")
     p.add_argument("--method", default="gb", choices=["gb", "pb", "both"])
     p.add_argument("--gb-model", type=int, default=2,
-                   help="igb value (default 2 = OBC2 / GBneck2-class).")
+                   help="igb value (default 2 = OBC model I; 5 = OBC model II; 8 = GBneck2).")
     p.add_argument("--ionic-strength", type=float, default=0.150)
     p.add_argument("--start-frame", type=int, default=1)
     p.add_argument("--end-frame", type=int, default=0,

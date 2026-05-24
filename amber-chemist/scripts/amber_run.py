@@ -115,7 +115,7 @@ def main() -> int:
                    choices=["berendsen", "monte_carlo", "off"])
     p.add_argument("--implicit-gb", default="gb2",
                    choices=["gb1", "gb2", "gb5", "gb7", "gb8"],
-                   help="GB model when --mode implicit (default GBneck2).")
+                   help="GB model when --mode implicit (default gb2 = OBC model I, igb=2; gb8 = GBneck2).")
     # REMD-only
     p.add_argument("--n-replicas", type=int, default=8)
     p.add_argument("--t-low", type=float, default=300.0)

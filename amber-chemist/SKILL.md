@@ -28,7 +28,7 @@ workflows your environment supports right now.
 **Environment-driven fallback strategy:**
 1. Parse the `[SUMMARY]` to determine available engines (pmemd.cuda, pmemd.cuda.MPI, pmemd, sander, etc.).
 2. If the user requests REMD but only single-replica engines are available, always recommend single-replica MD as the fallback.
-3. If the user requests implicit-solvent MD but only explicit-solvent libraries are present, report the gap clearly.
+3. If the user requests MMPBSA scoring or cpptraj analysis but `MMPBSA.py` / `cpptraj` is not on PATH, report the gap clearly rather than fabricating a workaround.
 4. Recommend the strongest path that the environment can run today; do not fabricate workarounds.
 
 ## MD-core method selection
@@ -45,6 +45,11 @@ workflows your environment supports right now.
 | T-REMD (multi-replica enhanced sampling) | `scripts/amber_remd.py` | Auto temperature ladder, groupfile, exchange-rate report parsed from `rem.log`. **Requires `.MPI` engine.** |
 
 *Deep dive: `references/md_core.md` for stage rendering, restart vs extend, restraints, barostat options, and implicit-solvent (GB) MD.*
+
+> **Barostat caveat:** the default Berendsen barostat produces the wrong
+> NPT distribution — use it for equilibration (the density stage) only.
+> Switch production to `--barostat monte_carlo` for correct NPT ensemble
+> averages. See `references/md_core.md` §Barostats.
 
 ## Add-ons (consume MD output; not part of the MD core)
 
@@ -96,7 +101,7 @@ the user something the prompt or input file already names.
 
 When the answer is genuinely underdetermined, frame the question with
 the option you'd pick and the reason — e.g., *"8 replicas geometric
-300-400 K gives ~12 K gaps, which should land inside the 15-50%
+300-400 K gives ~13–16 K gaps (widening with T), which should land inside the 15-50%
 acceptance window; keep that or hand-tune?"* — beats a blank "what
 ladder?".
 
@@ -122,8 +127,9 @@ depends on the verb:
 - Exchange-every (steps) and total time per replica
 - MPI engine + launcher (`mpirun` vs `srun`)
 - Implicit-solvent flag if relevant
-- Expected acceptance window — flag if any pair-gap exceeds ~15 K
-  or if N replicas is below 4
+- Expected acceptance window — geometric gaps widen with T (~13–16 K
+  for 8 replicas over 300–400 K is normal); flag only if a gap exceeds
+  ~30 K or if N replicas is below 4. The script warns at >50 K.
 
 **Add-ons (`amber_score.py`, `amber_analyze.py`, `amber_sp.py`):**
 
@@ -131,41 +137,26 @@ depends on the verb:
   range, MPI count
 - Analyze: which analyses (rmsd / rmsf / rdf / hbond / radgyr),
   masks, reference frame
-- SP: mode (snapshot / trajectory), implicit-solvent flag if the
-  prmtop is GB
+- SP: mode (snapshot / trajectory), frame slice (trajectory mode),
+  engine
 
 Keep it tight — a 4-6 line summary, not a paragraph. If the user has
 already approved the plan, don't re-ask.
 
 ## Carve-out relationship with `ase-chemist`
 
-`ase-chemist` ships a v1.3 small-molecule Amber carve-out
-(`parameterize_gaff2.py` + `run_amber.py`) that does plain GAFF2
-NPT MD only. `amber-chemist` is the **deeper Amber-native sibling**:
-restart-and-extend, REMD, implicit solvent, cpptraj-driven analysis,
-MMPBSA scoring. The two skills coexist; routing falls out of the
-trigger-phrase split (Amber-deep phrases reach here; ASE-shaped
-phrases reach `ase-chemist`).
-
-If the user is on a prompt in the shared zone (GAFF2 + AM1-BCC +
-TIP3P + plain MD, no Amber-deep terms), either skill produces a
-correct answer. See `references/carveout_relationship.md` for the
-two-paragraph version.
+`ase-chemist`'s v1.3 carve-out does plain GAFF2 NPT MD only; `amber-chemist`
+is the deeper sibling (restart/extend, REMD, implicit solvent, cpptraj,
+MMPBSA). Shared-zone prompts (GAFF2 + AM1-BCC + TIP3P + plain MD) are
+correct from either. See `references/carveout_relationship.md`.
 
 ## Looking up Amber semantics
 
-The Amber Reference Manual is the canonical source for mdin keyword
-behavior, force-field options, and file formats. Common references
-bundled here:
-
-- `references/manual_lookup.md` — curated URLs (Amber Reference Manual, AmberHub, tutorials, cpptraj/MMPBSA PDFs).
-- `references/mdin_keywords.md` — the ~50 most-asked mdin keywords as a flat table with manual section pointers.
-- `references/cpptraj_idioms.md` — recipe-style cpptraj commands (rms, atomicfluct, rdf, hbond, radgyr, esander, ensemble, strip, autoimage).
-- `references/mmpbsa_idioms.md` — drop-in MMPBSA decks (GB-only, PB+GB, alanine, per-residue, MPI).
-
-When a user asks "what does `<keyword>` do?", check
-`mdin_keywords.md` first, fall back to `manual_lookup.md` for the
-Reference Manual section.
+For mdin keyword behavior, force-field options, and file formats, check
+`references/mdin_keywords.md` first (the ~50 most-asked keywords), then
+`references/manual_lookup.md` for Reference Manual sections and curated
+URLs. cpptraj and MMPBSA idioms live in `references/cpptraj_idioms.md`
+and `references/mmpbsa_idioms.md`.
 
 **Smell test — don't fabricate.** If you are about to write *"I
 think `<keyword>` defaults to ..."* or *"the standard value for
@@ -173,23 +164,6 @@ think `<keyword>` defaults to ..."* or *"the standard value for
 Hallucinated Amber semantics is a high-cost, hard-to-detect failure
 mode — pmemd often *runs* with the wrong value and produces
 plausible-looking output that misleads downstream analysis.
-
-## Add-on extension surface
-
-When a new add-on is requested, follow the convention so the next
-add-on lands predictably:
-
-1. **Naming**: `scripts/amber_<noun>.py`.
-2. **Inputs**: `--prmtop` and either `--rst` or `--trajectory`.
-3. **Outputs**: per-add-on directory under `--output-dir`, with `<prefix>_summary.json` for chaining.
-4. **Helpers**: import `_amber` for engine pick, mdin / cpptraj-deck rendering, mdout / rem.log / MMPBSA.dat parsing.
-5. **Registration**: add a row to the "Add-ons" table above and a topic-scoped reference file under `references/`.
-6. **mdin-flag-only changes**: prefer extending an existing script with a flag (e.g. `amber_md.py --boost amd`) over creating a new script.
-
-`references/extension_map.md` lists the big Amber features not yet
-shipped and which script each one would land in (aMD, SMD, umbrella
-sampling, MBAR, H-REMD, TI/FEP, constant-pH, QM/MM, membrane,
-PLUMED).
 
 ## Reporting results
 
@@ -211,22 +185,11 @@ When you finish a task, report:
 
 ## Honest deferrals
 
-When the user asks for something this skill does not ship, point at
-`references/extension_map.md` rather than fabricating a workflow. For
-things this skill DOES ship but where the user is hitting trouble,
-check `references/failure_modes.md` first — it catalogs known failure
-modes across prep / MD / REMD / analysis / scoring with recovery
-recipes. Specifically deferred in v1.0:
-
-- **Free energy** (TI / FEP / MBAR) — `amber_fep.py` / `amber_mbar.py` would land here.
-- **Enhanced sampling other than T-REMD** — aMD, SMD, umbrella, metadynamics — mostly mdin-flag changes; `amber_md.py --boost {amd,smd,umbrella}` is the planned shape.
-- **Hamiltonian REMD** — `amber_remd.py --type H` is pre-wired, raises today.
-- **Biopolymers** (proteins, nucleic acids, complexes) — `amber_prep.py --force-field {ff19SB, OL21}` raises today.
-- **Constant-pH / constant-redox MD** — `amber_cpH.py` / `amber_cpE.py` would land here.
-- **QM/MM** — `amber_qmmm.py` would land here.
-- **Membrane / lipid (LIPID17)** — `amber_prep.py --membrane` + `amber_md.py --barostat anisotropic`.
-- **Multi-GPU pmemd.cuda** — `_amber.pick_engine(--gpu-count)` parameterization.
-- **PLUMED bridge** — `amber_md.py --plumed <plumed.dat>`.
-
-The skill must give an honest deferral pointer when asked, not pretend
-to support these.
+When the user asks for something this skill does not ship — free energy
+(TI / FEP / MBAR), enhanced sampling beyond T-REMD (aMD, SMD, umbrella,
+metadynamics), Hamiltonian REMD, biopolymers (ff19SB / OL21), constant-pH,
+QM/MM, membrane/LIPID17, multi-GPU, PLUMED — point at
+`references/extension_map.md` for the concrete landing spot rather than
+fabricating a workflow. Do not pretend to support these. For features this
+skill DOES ship but where the user is hitting trouble, check
+`references/failure_modes.md` first (known failure modes + recovery recipes).

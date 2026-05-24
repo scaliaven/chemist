@@ -30,7 +30,7 @@
 
 ## What this is
 
-`chemist` is the dev workspace for **two sibling Agent Skills** for [Claude Code](https://claude.com/claude-code) — small, scoped extensions that turn natural-language requests like *"thermalize this protein-ligand complex at 300 K"* into the right calculation, run through the right backend, with the limits stated up front.
+`chemist` is the dev workspace for **two sibling Agent Skills** for [Claude Code](https://claude.com/claude-code) — small, scoped extensions that turn natural-language requests like *"thermalize this solvated ligand at 300 K"* into the right calculation, run through the right backend, with the limits stated up front.
 
 - **[`ase-chemist`](ase-chemist/)** — atomistic / molecular simulation on top of [ASE](https://wiki.fysik.dtu.dk/ase/). Seven backends behind one method-selection router: ASE built-ins (EMT, LJ, TIP3P), [tblite-xTB](https://github.com/tblite/tblite), [MACE](https://github.com/ACEsuit/mace) foundation models, an Amber-GAFF2 carve-out for small-molecule MD, and Gaussian DFT (SP / Opt / Freq).
 - **[`amber-chemist`](amber-chemist/)** — Amber-native MD sibling. Single-replica MD with restart / extend, **T-REMD as a first-class capability**, plus add-ons for cpptraj-driven analysis, single-point energies, and MMPBSA endpoint scoring.
@@ -43,49 +43,12 @@ Both ship a trigger-test harness that runs prompts through `claude -p` in fresh 
 
 ## Why you might care
 
-Computational-chemistry tooling tends toward two failure modes:
+Comp-chem tooling tends to be either *"here are 50 tools, you figure it out"* (general-purpose ASE) or *"here's a black box, give me your structure"* (opinionated wrapper). These skills sit between, on a shared design rigor:
 
-- *"here are 50 tools, you figure it out"* — every general-purpose ASE script
-- *"here's a black box, give me your structure"* — every opinionated wrapper
-
-Both skills land between them, on a shared design rigor:
-
-<table>
-<tr>
-<td width="50%" valign="top">
-
-### Right method for the system, not the request
-
-A *"minimize this molecule"* prompt walks a documented 3-step tree: **task → calculator → install check**. EMT on an organic gets caught. GFN2-xTB MD on a 5000-atom system gets redirected to MACE. Each rule has a stated *why*.
-
-</td>
-<td width="50%" valign="top">
-
-### Honest about limits
-
-xTB MD stops being practical at ~1k atoms. MACE-medium tops out near 1–2k atoms on a 40 GB GPU. ASE's `Amber` calculator can't drive production MD. Gaussian's `read_gaussian_out` doesn't parse vibrational frequencies. **None of those are hidden** — they surface in plain language whenever they're load-bearing.
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-### Cross-validation is non-negotiable for ML potentials
-
-Every MACE MD run validates against GFN2-xTB every 1 ps and aborts when force MAE exceeds 100 meV/Å. Opt-out (`--no-validate`) is **per-run, not the default**. ML potentials produce plausible-but-wrong PESs that users can't spot on their own — the contract under which the skill recommends MACE at all is that it doesn't.
-
-</td>
-<td width="50%" valign="top">
-
-### No DFT method / basis defaults
-
-The Gaussian scripts refuse to run without an explicit `--method` and `--basis` (plus `--charge`, `--multiplicity`, `--mem`, `--nproc`). Wrong-physics defaults — B3LYP/6-31G(d) silently picked on a transition-metal system — are the same failure mode the skill guards against elsewhere. Same logic, same answer.
-
-</td>
-</tr>
-</table>
-
-If those principles match how you'd want a simulation tool to behave, the codebase is worth a read. If you'd rather something that *"just works"* without guardrails, you'll find them in the way.
+- **Right method for the system, not the request.** A *"minimize this molecule"* prompt walks a documented `task → calculator → install check` tree, each rule with a stated *why*. EMT on an organic gets caught; GFN2-xTB on a 5000-atom system gets redirected to MACE.
+- **Honest about limits.** xTB MD stops being practical at ~1k atoms; MACE-medium tops out near 1–2k on a 40 GB GPU; ASE's `Amber` calculator can't drive production MD. These surface in plain language whenever they're load-bearing — never hidden.
+- **Cross-validation is non-negotiable for ML potentials.** Every MACE MD run validates against GFN2-xTB every 1 ps and aborts at force MAE > 100 meV/Å. Opt-out is per-run, not the default — ML potentials produce plausible-but-wrong PESs users can't spot on their own.
+- **No DFT method / basis defaults.** The Gaussian scripts refuse to run without explicit `--method` / `--basis` (plus charge, multiplicity, resources). A silently-picked B3LYP/6-31G(d) on a transition metal is the same wrong-physics failure mode guarded against elsewhere.
 
 ---
 
@@ -108,7 +71,7 @@ python scripts/run_md.py --structure system.xyz --calculator mace \
 # validation.csv written every 1 ps; aborts at MAE_F > 100 meV/Å
 ```
 
-A different prompt — *"compute G_298 for caffeine at B3LYP-D3/def2-TZVP"* — routes to `gaussian_opt.py` → `gaussian_freq.py`, confirms `%mem` / `%nprocshared` first, and parses the thermochemistry block in-house. A *"build a Pt(111) slab with a CO adsorbate and relax it"* prompt stays inline with `ase.build` — no script for a 5-line task. The router does the right thing in each case, and says what it's doing.
+Other prompts route differently: *"compute G_298 for caffeine at B3LYP-D3/def2-TZVP"* → `gaussian_opt.py` → `gaussian_freq.py` (in-house thermochem parsing); *"build a Pt(111) slab with a CO adsorbate"* stays inline with `ase.build` — no script for a 5-line task.
 
 See [`ase-chemist/README.md`](ase-chemist/README.md) and [`amber-chemist/README.md`](amber-chemist/README.md) for the full user-facing walkthroughs.
 
@@ -174,23 +137,15 @@ python amber-chemist/scripts/check_env.py
 
 ## The trigger-test harness
 
-`run_tests.sh` runs prompts in fresh `claude -p` sessions with a 180 s wall-clock cap each. Each prompt is tagged:
-
-- **`trigger`** — the skill should activate and produce a correct script.
-- **`no_trigger`** — generic prompts that should not invoke the skill.
-- **`borderline`** — definitional questions or graceful-deferral cases where either response is defensible; for human review.
+`run_tests.sh` runs prompts in fresh `claude -p` sessions (180 s cap each), each tagged `trigger` (should activate + write correct code), `no_trigger` (should stay out), or `borderline` (either response defensible; human review).
 
 ```bash
 python generate_test.py            # regenerate fixtures
 bash run_tests.sh                  # full sweep
 TIMEOUT_SECS=300 bash run_tests.sh # longer per-prompt cap
-
-for f in results/*.status; do
-  printf "%-22s %s\n" "$(basename "$f" .status)" "$(cat "$f")"
-done
 ```
 
-The 180 s budget is intentionally too short to actually run a simulation — the test asks *"did Claude write the right code?"*, not *"did the code finish?"*. Every prompt instructs the model not to execute its output. `evals/evals.json` (per skill) is a separate set of richer prompts with free-form expected outputs for manual review.
+The cap is intentionally too short to finish a simulation — the test asks *"did Claude write the right code?"*, not *"did it run?"*. Every prompt says not to execute its output. `evals/evals.json` (per skill) holds richer prompts for manual review.
 
 ---
 
@@ -198,71 +153,24 @@ The 180 s budget is intentionally too short to actually run a simulation — the
 
 ```
 chemist/
-├── ase-chemist/                       # skill #1 dev source — edit here
-│   ├── SKILL.md                          # trigger contract + method-selection tree
-│   ├── README.md                         # user-facing README
-│   ├── scripts/                          # optimize, run_md, gaussian_*, …
-│   ├── references/                       # scoped reference files
-│   └── evals/evals.json                  # prompts for manual review
-├── amber-chemist/                     # skill #2 dev source — edit here
-│   ├── SKILL.md
-│   ├── README.md
-│   ├── scripts/                          # amber_run, amber_md, amber_remd, …
-│   ├── references/                       # topic-scoped reference files
-│   └── evals/evals.json
-├── .claude/skills/{ase,amber}-chemist/    # project skill copies (what claude -p loads)
-├── ~/.claude/skills/{ase,amber}-chemist/  # user skill copies (kept in parity)
-├── CLAUDE.md                          # design decisions for Claude Code sessions
-├── generate_test.py                   # fixture generator
-├── run_tests.sh                       # trigger-test harness
-├── test-inputs/                       # generated fixtures (gitignored)
-└── results/                           # per-run logs + .status (gitignored)
+├── ase-chemist/      # skill #1 dev source — SKILL.md, README.md, scripts/, references/, evals/
+├── amber-chemist/    # skill #2 dev source — same shape
+├── .claude/skills/{ase,amber}-chemist/    # project copies (what `claude -p` loads)
+├── ~/.claude/skills/{ase,amber}-chemist/  # user copies (kept in parity)
+├── CLAUDE.md         # design decisions + three-copy sync rules
+├── run_tests.sh / generate_test.py        # trigger-test harness + fixtures
+└── test-inputs/ , results/                # generated fixtures + run logs (gitignored)
 ```
 
-Each skill has **three** copies on the machine: dev source, the project skill copy under `.claude/skills/`, and the user skill copy under `~/.claude/skills/`. Tests run against the loaded copies, not the dev source. After every edit:
-
-```bash
-# ase-chemist
-rsync -a --delete ase-chemist/ .claude/skills/ase-chemist/
-rsync -a --delete ase-chemist/ ~/.claude/skills/ase-chemist/
-
-# amber-chemist
-rsync -a --delete amber-chemist/ .claude/skills/amber-chemist/
-rsync -a --delete amber-chemist/ ~/.claude/skills/amber-chemist/
-
-# parity check
-diff -rq ase-chemist .claude/skills/ase-chemist
-diff -rq amber-chemist .claude/skills/amber-chemist
-```
+Each skill has **three** copies: dev source (edit here), the project copy, and the user copy. Tests load the copies, not the dev source — so `rsync` after every edit (see [Contributing](#contributing)).
 
 ---
 
 ## Project documentation
 
-<table>
-<tr>
-<td width="50%" valign="top">
-
-**`ase-chemist`**
-
-- [`README.md`](ase-chemist/README.md) — user-facing: backends, examples, design principles, install. Start here to understand what the skill does.
-- [`SKILL.md`](ase-chemist/SKILL.md) — the trigger contract (`description` field), method-selection tree, scripts catalog. Load-bearing for activation.
-- [`references/`](ase-chemist/references/) — small scoped reference files (1–4k chars each). `ml_potentials.md` and `gaussian.md` are thin indices; `amber.md` is self-contained.
-
-</td>
-<td width="50%" valign="top">
-
-**`amber-chemist`**
-
-- [`README.md`](amber-chemist/README.md) — user-facing: what ships, what's deferred, carve-out relationship.
-- [`SKILL.md`](amber-chemist/SKILL.md) — trigger contract + method-selection tree (single-replica MD, T-REMD, add-ons, escape hatches).
-- [`references/`](amber-chemist/references/) — topic-scoped files (`md_core`, `remd`, `force_fields`, `analysis`, `scoring`, `failure_modes`, `extension_map`, …).
-
-</td>
-</tr>
-</table>
-
-**Repo-level:** [`CLAUDE.md`](CLAUDE.md) for load-bearing design decisions and the three-copy sync rules.
+- **`ase-chemist`** — [`README.md`](ase-chemist/README.md) (user-facing: backends, examples, install) · [`SKILL.md`](ase-chemist/SKILL.md) (trigger contract + method-selection tree) · [`references/`](ase-chemist/references/) (scoped reference files).
+- **`amber-chemist`** — [`README.md`](amber-chemist/README.md) · [`SKILL.md`](amber-chemist/SKILL.md) · [`references/`](amber-chemist/references/) (`md_core`, `remd`, `scoring`, `failure_modes`, …).
+- **Repo-level** — [`CLAUDE.md`](CLAUDE.md) for load-bearing design decisions and the three-copy sync rules.
 
 ---
 
@@ -278,3 +186,9 @@ Workflow for skill edits:
 4. Update the relevant `references/*.md` if you changed a contract (cross-validation threshold, method-selection rule, deferral surface).
 
 See [`CLAUDE.md`](CLAUDE.md) for the full design-decision rationale.
+
+## License
+
+Released under the [MIT License](LICENSE). The backends the skills orchestrate
+(ASE, tblite/xTB, MACE, AmberTools, Gaussian) carry their own licenses and
+citation requirements — install and cite each per its own terms.

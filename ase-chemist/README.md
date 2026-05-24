@@ -116,7 +116,7 @@ caught; GFN2-xTB on a 5000-atom system gets redirected to MACE.
 
 ### 2. Everything through ASE-or-our-own-code
 
-All seven backends speak ASE's `Calculator` pattern. Output parsing
+Six of the seven backends speak ASE's `Calculator` pattern. Output parsing
 that ASE doesn't cover (Gaussian frequencies, thermochem, MO
 eigenvalues) lives in a small in-house regex helper —
 `scripts/_gaussian_log.py`, ~100 lines of stdlib — not a third-party
