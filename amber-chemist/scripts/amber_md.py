@@ -156,6 +156,10 @@ def main() -> int:
         raise SystemExit("--stage custom requires --mdin <file>.")
     if args.restart and args.extend:
         raise SystemExit("--restart and --extend are mutually exclusive.")
+    if args.restraint_mask and not args.ref:
+        print("[md] WARNING: --restraint-mask set without --ref; pmemd will "
+              "use the input coords as the harmonic reference, which is "
+              "usually not what you want. Pass --ref <reference.rst7>.")
 
     prmtop = Path(args.prmtop).resolve()
     rst = Path(args.rst).resolve()
@@ -224,6 +228,7 @@ def main() -> int:
             write_every=args.write_every,
             restraint_mask=args.restraint_mask,
             restraint_weight=args.restraint_weight,
+            irest=args.restart or args.extend,
         )
     elif args.stage == "prod":
         n_steps = args.n_steps if args.n_steps is not None else 250000

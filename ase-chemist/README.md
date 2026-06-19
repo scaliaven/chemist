@@ -159,7 +159,7 @@ picked on a transition-metal system) is the failure mode v1 already
 guards against elsewhere; same logic applies here. When asked
 "what should I use?", the skill surfaces a recommendation
 (ωB97X-D/def2-TZVP for organics; PBE0-D3(BJ)/def2-TZVP for transition
-metals — `references/gaussian_no_defaults.md` §1) and confirms before
+metals — `references/gaussian_method_selection.md`) and confirms before
 running.
 
 ---
