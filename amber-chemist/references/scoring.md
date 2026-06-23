@@ -111,14 +111,24 @@ different residues. `idecomp=1` is per-residue, intra-only. `=3/=4`
 add backbone/sidechain breakdowns.
 
 ### Computational alanine scan (`--alanine-scan`)
-Add `&alanine_scanning` block (no parameters needed):
+MMPBSA.py does **not** auto-scan the interface. You pick one residue,
+build a **mutant topology** in which that single residue is mutated to
+alanine (`tleap`, ParmEd, or `ante-MMPBSA.py`), then run with both the
+wild-type prmtops (`-cp/-rp/-lp`) and the mutant prmtop — `-mr`
+(mutant receptor) and/or `-ml` (mutant ligand), optionally `-mc`
+(mutant complex). Add the `&alanine_scanning` namelist (its only
+option is `mutant_only=1`, "score the mutant only"):
 ```
 &alanine_scanning
 /
 ```
-MMPBSA.py mutates each interface residue to alanine in silico and
-re-evaluates the binding energy; the difference is the "ΔΔG of
-alanine substitution." Useful for hot-spot identification.
+MMPBSA.py evaluates wild-type and mutant on the **same trajectory** and
+reports ΔΔG = ΔG_mutant − ΔG_wild-type for that **one** residue. To
+scan several residues, build one mutant per residue and run once each.
+Without a mutant topology it hard-errors: *"Alanine scanning requires
+either a mutated receptor or mutated ligand topology file!"* In
+`amber_score.py`, supply the mutant via `--mutant-receptor-prmtop`
+and/or `--mutant-ligand-prmtop`.
 
 ## MPI parallelism
 
@@ -165,8 +175,11 @@ mmpbsa/
   trajectory has waters; MMPBSA.py can't tell what to strip.
 - **MPI hangs** — usually `MMPBSA.py.MPI` ≠ pmemd MPI flavor mismatch.
   Source the same Amber environment that built the MPI variant.
-- **alanine_scan finds no residues** — interface residues need to be
-  in both the receptor and ligand selection; check the prmtops.
+- **"Alanine scanning requires either a mutated receptor or mutated
+  ligand topology file!"** — you set `&alanine_scanning` /
+  `--alanine-scan` without a mutant topology. Build a one-residue→ALA
+  mutant prmtop and pass it via `-mr`/`-ml` (`--mutant-receptor-prmtop`
+  / `--mutant-ligand-prmtop`).
 
 ## Reference manual
 

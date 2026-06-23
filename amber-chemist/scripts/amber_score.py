@@ -22,11 +22,11 @@ Examples:
         --trajectory prod.nc --method gb --mpi 4 \\
         --output-dir mmpbsa/
 
-    # Alanine scan + per-residue decomp
+    # Alanine scan (one residue -> ALA per run; supply the mutant prmtop)
     python amber_score.py --complex-prmtop com.prmtop \\
         --receptor-prmtop rec.prmtop --ligand-prmtop lig.prmtop \\
-        --trajectory prod.nc --method gb \\
-        --alanine-scan --per-residue --output-dir mmpbsa/
+        --trajectory prod.nc --method gb --alanine-scan \\
+        --mutant-receptor-prmtop rec_R100A.prmtop --output-dir mmpbsa/
 
 Output:
     <prefix>.in                   — MMPBSA input deck
@@ -124,6 +124,16 @@ def main() -> int:
     p.add_argument("--stride", type=int, default=1)
     p.add_argument("--per-residue", action="store_true")
     p.add_argument("--alanine-scan", action="store_true")
+    # Computational alanine scanning needs a user-built mutant topology
+    # (one residue -> ALA); MMPBSA.py does not auto-mutate. Passed through
+    # as -mc/-mr/-ml. MMPBSA.py requires at least the mutated receptor or
+    # mutated ligand. See references/scoring.md.
+    p.add_argument("--mutant-complex-prmtop", default=None,
+                   help="Mutant complex prmtop for --alanine-scan (-mc).")
+    p.add_argument("--mutant-receptor-prmtop", default=None,
+                   help="Mutant receptor prmtop for --alanine-scan (-mr).")
+    p.add_argument("--mutant-ligand-prmtop", default=None,
+                   help="Mutant ligand prmtop for --alanine-scan (-ml).")
     p.add_argument("--mpi", type=int, default=1,
                    help="If > 1, uses MMPBSA.py.MPI.")
     p.add_argument("--keep-files", action="store_true")
@@ -147,6 +157,27 @@ def main() -> int:
         if not f.exists():
             raise SystemExit(f"file not found: {f}")
 
+    # Resolve mutant topologies for computational alanine scanning. MMPBSA.py
+    # diffs WT against a one-residue->ALA mutant and requires at least the
+    # mutated receptor or ligand; it hard-errors otherwise.
+    mut_flags = []
+    if args.alanine_scan:
+        for flag, val in (("-mc", args.mutant_complex_prmtop),
+                          ("-mr", args.mutant_receptor_prmtop),
+                          ("-ml", args.mutant_ligand_prmtop)):
+            if val:
+                mp = Path(val).resolve()
+                if not mp.exists():
+                    raise SystemExit(f"file not found: {mp}")
+                mut_flags += [flag, str(mp)]
+        if "-mr" not in mut_flags and "-ml" not in mut_flags:
+            raise SystemExit(
+                "--alanine-scan needs a mutant topology: pass "
+                "--mutant-receptor-prmtop and/or --mutant-ligand-prmtop "
+                "(one residue mutated to alanine). MMPBSA.py does not "
+                "auto-mutate; see references/scoring.md."
+            )
+
     out_dir = Path(args.output_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     deck = out_dir / f"{args.output_prefix}.in"
@@ -155,6 +186,7 @@ def main() -> int:
     cmd = [binary, "-O", "-i", str(deck),
            "-cp", str(com), "-rp", str(rec), "-lp", str(lig),
            "-y", str(traj)]
+    cmd += mut_flags
     if args.solvated_prmtop:
         cmd += ["-sp", str(Path(args.solvated_prmtop).resolve())]
     if args.mpi > 1:
