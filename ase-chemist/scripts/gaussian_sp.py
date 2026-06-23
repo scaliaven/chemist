@@ -20,7 +20,7 @@ Defaults policy (v1.4):
     guards against (B3LYP/6-31G(d) is fine for thermochem of small
     organics but a terrible choice for transition metals; ωB97X-D
     is better for organics but slower; etc.). Common reasonable
-    choices documented in references/gaussian.md §1.
+    choices documented in references/gaussian_method_selection.md.
 
     Resource flags --mem and --nproc are also required: psutil
     detection misreads NUMA / cgroups / shared queue nodes, so the

@@ -187,16 +187,24 @@ def render_density(
     write_every: int = 500,
     restraint_mask: Optional[str] = None,
     restraint_weight: float = 10.0,
+    irest: bool = True,
 ) -> str:
-    """Density equilibration is meaningful only with explicit solvent."""
+    """Density equilibration is meaningful only with explicit solvent.
+
+    Defaults to a restart deck (irest=1, ntx=5) because density normally
+    chains off heat's velocities. Pass irest=False for a standalone start
+    from a velocity-less rst7, or pmemd aborts (see failure_modes.md).
+    """
     rb = _restraint_block(restraint_mask, restraint_weight)
     bk = _barostat_keys(barostat)
     ps = n_steps * timestep
+    ntx = "5" if irest else "1"
+    irest_flag = "1" if irest else "0"
     return (
         f"Density equilibration, {ps:.1f} ps NPT at {temp:.1f} K "
         f"({barostat} barostat)\n"
         "&cntrl\n"
-        "  imin=0, irest=1, ntx=5,\n"
+        f"  imin=0, irest={irest_flag}, ntx={ntx},\n"
         f"  nstlim={n_steps}, dt={timestep:g},\n"
         f"{bk}"
         f"  cut={cut:g},\n"

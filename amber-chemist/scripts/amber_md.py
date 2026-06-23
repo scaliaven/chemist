@@ -48,7 +48,7 @@ Examples:
         --stage prod --extend --n-steps 1000000 \\
         --output-prefix prod --output-dir run/
 
-    # Implicit-solvent (GBneck2) production
+    # Implicit-solvent (OBC model I, igb=2) production
     python amber_md.py --prmtop sys.prmtop --rst sys.rst7 \\
         --stage prod --implicit-solvent gb2 --n-steps 2500000 \\
         --output-prefix prod --output-dir run/
@@ -139,7 +139,7 @@ def main() -> int:
                    help="Trajectory write frequency (ntwx).")
     p.add_argument("--implicit-solvent", default="off",
                    choices=list(GB_MAP),
-                   help="Implicit GB model. off=explicit; gb2=GBneck2.")
+                   help="Implicit GB model. off=explicit; gb2=OBC model I; gb8=GBneck2.")
     p.add_argument("--engine", default=None,
                    help="Engine override (pmemd.cuda / pmemd / sander).")
     p.add_argument("--mdin", default=None,
@@ -156,6 +156,10 @@ def main() -> int:
         raise SystemExit("--stage custom requires --mdin <file>.")
     if args.restart and args.extend:
         raise SystemExit("--restart and --extend are mutually exclusive.")
+    if args.restraint_mask and not args.ref:
+        print("[md] WARNING: --restraint-mask set without --ref; pmemd will "
+              "use the input coords as the harmonic reference, which is "
+              "usually not what you want. Pass --ref <reference.rst7>.")
 
     prmtop = Path(args.prmtop).resolve()
     rst = Path(args.rst).resolve()
@@ -224,6 +228,7 @@ def main() -> int:
             write_every=args.write_every,
             restraint_mask=args.restraint_mask,
             restraint_weight=args.restraint_weight,
+            irest=args.restart or args.extend,
         )
     elif args.stage == "prod":
         n_steps = args.n_steps if args.n_steps is not None else 250000

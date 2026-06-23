@@ -52,7 +52,8 @@ trajectory. Always use `--extend` for same-stage continuation.
 ## Restraints
 
 `--restraint-mask <amber-mask>` + `--restraint-weight <kcal/mol/Å²>`
-adds a `&restraint` block:
+adds positional-restraint keywords to the `&cntrl` namelist (Amber has no
+separate `&restraint` namelist for these):
 
 ```
 ntr=1, restraintmask='@CA,C,N&!@H=', restraint_wt=10.0,
@@ -78,8 +79,8 @@ periodic-box mdin block for `ntb=0, igb=N, cut=999.0`. Effects:
 - Recommended for fast small-peptide sampling and for the GB-MD legs
   of binding studies where explicit-solvent is too expensive.
 
-`igb=2` (GBneck2) is the v1.0 default — Onufriev's well-validated
-GB model for small peptides. `igb=8` is the most modern, most
+`igb=2` (OBC model I) is the v1.0 default — Onufriev's well-validated
+GB model for small peptides. `igb=8` (GBneck2) is the most modern, most
 expensive. See `mdin_keywords.md` for the full pricing table.
 
 ## Barostats

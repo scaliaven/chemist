@@ -1,6 +1,6 @@
 ---
 name: ase-chemist
-description: Use this skill whenever the user wants to run, set up, or analyze atomistic simulations on molecules or materials. This covers: molecular dynamics (MD, NVE, NVT, NPT, Langevin, Nose-Hoover) including thermalization, equilibration, and "warm up the system" requests; geometry optimization, energy minimization, or relaxation (BFGS, FIRE, LBFGS — "minimize this molecule", "relax this structure", "find the equilibrium geometry"); vibrational frequency, normal-mode, Hessian, and zero-point-energy analysis; NEB and transition-state searches; structure building (small molecules, bulk crystals, surfaces like fcc111, slabs with adsorbates); trajectory analysis (RMSD, RMSF, RDF, energy drift); single-point energy and force evaluation; binding, interaction, and adsorption energy calculations; explicit-solvent small-molecule MD with GAFF2 + AM1-BCC charges via antechamber, tleap, sander, and pmemd; DFT via Gaussian (g16/g09) — SP / Opt / Freq / thermochemistry (ZPE, enthalpy, Gibbs free energy) — with B3LYP, ωB97X-D, M06-2X, PBE0 functionals, def2-TZVP / 6-31G(d) basis sets, and SMD/PCM solvation; foundation-model ML potentials (MACE-MP-0, MACE-OFF); semi-empirical xTB (GFN1, GFN2, GFN0, GFN-FF via tblite or the xtb binary); ASE built-ins (EMT, Lennard-Jones, TIP3P); and electronic observables (HOMO-LUMO gap, dipole, Mulliken charges). Reach for this skill even when the user does not name ASE — phrases like "minimize this molecule", "relax this geometry", "thermalize at 300 K", "equilibrate the system", "compute the binding energy", "run MD on water", "build a Pt(111) slab", "compute frequencies", "speed up this MD with a foundation model", "use MACE", "run a 5000-atom system", "ligand MD in water", "GAFF2 parameterization", "AM1-BCC charges", "antechamber", "run a DFT calculation", "compute thermochemistry at B3LYP/def2-TZVP", "Gibbs free energy of this reaction", "Gaussian SMD water", or "DFT frequency analysis" should all trigger this skill. For Amber-deep prompts (REMD, MMPBSA, cpptraj, esander, alanine scan, GB-implicit MD, ff19SB, OL21, per-residue decomposition), route to the sibling `amber-chemist` skill instead.
+description: Use this skill whenever the user wants to run, set up, or analyze atomistic simulations on molecules or materials. This covers: molecular dynamics (MD, NVE, NVT, NPT, Langevin, Nose-Hoover) including thermalization, equilibration, and "warm up the system" requests; geometry optimization, energy minimization, or relaxation (BFGS, FIRE, LBFGS — "minimize this molecule", "relax this structure", "find the equilibrium geometry"); vibrational frequency, normal-mode, Hessian, and zero-point-energy analysis; NEB minimum-energy-path scaffolding (inline; no turnkey transition-state search); structure building (small molecules, bulk crystals, surfaces like fcc111, slabs with adsorbates); trajectory analysis (RMSD, RMSF, RDF, energy drift); single-point energy and force evaluation; binding, interaction, and adsorption energy calculations; explicit-solvent small-molecule MD with GAFF2 + AM1-BCC charges via antechamber, parmchk2, tleap, and pmemd; DFT via Gaussian (g16/g09) — SP / Opt / Freq / thermochemistry (ZPE, enthalpy, Gibbs free energy) — with B3LYP, ωB97X-D, M06-2X, PBE0 functionals, def2-TZVP / 6-31G(d) basis sets, and SMD/PCM solvation; foundation-model ML potentials (MACE-MP-0, MACE-OFF); semi-empirical xTB (GFN1-xTB, GFN2-xTB via tblite); ASE built-ins (EMT, Lennard-Jones, TIP3P); and electronic observables (HOMO-LUMO gap, dipole, Mulliken charges). Reach for this skill even when the user does not name ASE — phrases like "minimize this molecule", "relax this geometry", "thermalize at 300 K", "equilibrate the system", "compute the binding energy", "run MD on water", "build a Pt(111) slab", "compute frequencies", "speed up this MD with a foundation model", "use MACE", "run a 5000-atom system", "ligand MD in water", "GAFF2 parameterization", "AM1-BCC charges", "antechamber", "run a DFT calculation", "compute thermochemistry at B3LYP/def2-TZVP", "Gibbs free energy of this reaction", "Gaussian SMD water", or "DFT frequency analysis" should all trigger this skill. For Amber-deep prompts (REMD, MMPBSA, cpptraj, esander, alanine scan, GB-implicit MD, ff19SB, OL21, per-residue decomposition), route to the sibling `amber-chemist` skill instead.
 license: MIT
 ---
 
@@ -44,13 +44,10 @@ C extension unloadable`, the pip wheel is libgfortran-incompatible — switch
 to `conda install -c conda-forge tblite-python`. The standalone `xtb`
 binary (Grimme group) adds GFN0 and GFN-FF if it's on PATH.
 
-`mace-torch` provides the **MACE-MP-0** (89-element materials/inorganic
-foundation model) and **MACE-OFF** (10-element organics foundation
-model) calculators. Together they cover the systems where GFN2-xTB
-runs out of speed (~1k+ atoms). MACE requires `torch`; CUDA is
-strongly recommended (CPU mode is ~10× slower and the practical size
-ceiling halves). `check_env.py` reports CUDA status and a soft size-
-cliff warning based on free VRAM.
+`mace-torch` provides the **MACE-MP-0** and **MACE-OFF** calculators
+(element-set routing and the ~1k-atom size cliff are covered in Step-2
+rule 6). MACE requires `torch`; CUDA is strongly recommended (CPU mode
+is ~10× slower). `check_env.py` reports CUDA status and a size-cliff warning.
 
 ## Method selection
 
@@ -88,13 +85,10 @@ Apply the first rule that fits the system, in this order:
 3. **If the system is pure water** (H₂O molecules only), the choice
    depends on the task:
    - **Production MD** → **TIP3P**. *Why:* parameterized for exactly this
-     case. **Requires `ase.constraints.FixBondLengths`** to keep the rigid
-     O–H / H–H geometry — TIP3P is a rigid-body model and bare ASE will
-     let the bonds vibrate, blowing up the simulation. See
-     `references/ase_core.md` §Water (TIP3P + FixBondLengths). The
-     bundled scripts do **not** auto-attach this constraint; you must add
-     it inline before handing the script the structure, or write a short
-     inline driver that does.
+     case. **Requires `ase.constraints.FixBondLengths`** (rigid-body
+     model; bare ASE lets the O–H/H–H bonds vibrate and the run blows
+     up). The bundled scripts do **not** auto-attach it — add it inline.
+     See `references/ase_core.md` §Water (TIP3P + FixBondLengths).
    - **One-off relaxations or quick energy / single-point checks** on
      small water systems → **GFN2-xTB**. *Why:* simpler — no constraints
      to set up — and small water clusters are well within xTB's accuracy
@@ -114,32 +108,20 @@ Apply the first rule that fits the system, in this order:
    `references/amber.md` for force-field and water-model details.*
 
    > **⚠️ Architecture note (v1.3 Amber).** Amber is the **only engine in
-   > the skill that does not run through ASE**. `parameterize_gaff2.py`
-   > and `run_amber.py` shell out to AmberTools and pmemd directly; the
-   > MD integration loop runs natively in pmemd, not in ASE. ASE handles
-   > structure I/O at the boundaries and post-hoc analysis via
-   > `analyze_traj.py`, but the simulation itself is opaque to ASE.
-   > **The carve-out was a performance choice, not forced.** ASE does
-   > expose an in-process Amber path via `ase.calculators.amber.SANDER`
-   > (pysander Python bindings to sander), which would let
-   > `run_md.py --calculator amber-sander` work cleanly. v1.3 chose
-   > pmemd shell-out anyway because pmemd.cuda is GPU-accelerated and
-   > ~10–50× faster than CPU sander on production-sized systems
-   > (5–50k atoms); the SANDER path is CPU-only (pysander does not
-   > bind to pmemd.cuda) and carries a "tested only for amber16"
-   > disclaimer. **This trade is under review** — four options on the
-   > table: keep pmemd shell-out, switch to SANDER+ASE Langevin,
-   > remove Amber entirely, or build the missing API path (write a
-   > proper ASE Calculator around pmemd/pmemd.cuda so the wrapper is
-   > ASE-shaped and still hits pmemd.cuda speed). See
-   > `references/amber.md` §1 and `PLAN.md` §"Phase 3" for the open
-   > question. When recommending GAFF2 to the user, surface the
-   > carve-out honestly so they can decide whether they want it.
+   > the skill that does not run through ASE** — `parameterize_gaff2.py`
+   > and `run_amber.py` shell out to AmberTools and pmemd, and the MD loop
+   > runs natively in pmemd. This is a performance choice, not forced: ASE
+   > exposes a CPU-only in-process path (`ase.calculators.amber.SANDER`),
+   > but pmemd.cuda is ~10–50× faster on production-sized systems. The
+   > trade is under review (four options open). See `references/amber.md`
+   > §1 and `PLAN.md` §"Phase 3", and surface the carve-out when
+   > recommending GAFF2 so the user can decide whether they want it.
 5. **If the system is a transition-metal complex and GFN2 fails to
    converge**, fall back to **GFN1-xTB**. *Why:* GFN1 is more robust on
    d-block elements at the cost of some accuracy.
-6. **If the system is past the xTB size cliff (~1k atoms or ~10 ps of
-   xTB MD), reach for a MACE foundation model.** *Why:* GFN2-xTB MD
+6. **If the system is past the xTB size cliff (~1k atoms; xTB MD on a
+   system that size is impractical past a few ps), reach for a MACE
+   foundation model.** *Why:* GFN2-xTB MD
    stops being practical at ~1k atoms; MACE foundation models (MACE-OFF
    for organics, MACE-MP-0 for crystals/materials) deliver roughly
    DFT-quality energies and forces in that 1k–~2k atom range on a
@@ -166,7 +148,8 @@ Apply the first rule that fits the system, in this order:
    on relative energies and is unreliable on transition metals;
    DFT is the right tool. **No method/basis defaults** — surface a
    recommendation (ωB97X-D/def2-TZVP for organics; PBE0-D3(BJ)/def2-
-   TZVP for transition metals; see `references/gaussian.md` §1) and
+   TZVP for transition metals; see
+   `references/gaussian_method_selection.md`) and
    confirm before running. The scripts also require explicit
    `--charge`, `--mult`, `--mem`, `--nproc`. Solvent → SMD by
    default. Thermochem parsing is in-house (`_gaussian_log.py`),
@@ -238,10 +221,9 @@ Per-script use:
 - **`scripts/run_md.py`** — NVE / NVT-Langevin / NVT-Nose-Hoover MD with
   EMT / LJ / TIP3P / xTB / MACE. Defaults tuned for organic molecules
   (1 fs, 300 K, Langevin friction 0.01/fs, log every 100 steps). With
-  `--calculator mace`, cross-validation against GFN2-xTB runs
-  automatically every 1 ps (`--validate-every`); MD aborts if MAE_F >
-  100 meV/Å (`--abort-mae-f`). Disable with `--no-validate` only for
-  specific reasons.
+  `--calculator mace`, GFN2-xTB cross-validation runs by default (the
+  contract in Step-2 rule 6; flags `--validate-every`, `--abort-mae-f`,
+  `--no-validate`).
 - **`scripts/ml_calculator.py`** — Helper exposing
   `make_ml_calc(atoms, system_class=, device=, model_size=)`. Imported
   by `optimize.py` and `run_md.py` when `--calculator mace`. Run as
@@ -258,32 +240,27 @@ Per-script use:
   `.rst7` pair for `run_amber.py`. **Mandatory: `--net-charge` matches
   the formal charge** — getting it wrong silently shifts every partial
   charge.
-- **`scripts/run_amber.py`** — Runs Amber MD on a `.prmtop` / `.rst7`
-  pair. `--protocol standard` runs min → heat (50 ps NVT, 0→300 K) →
-  density (100 ps NPT) → prod (default 500 ps NPT). Engine auto-picks
-  `pmemd.cuda` > `pmemd` > `sander`; override with `--engine`. Outputs
-  NetCDF `.nc` for `analyze_traj.py`. v1.3 `mdin` defaults are
-  GAFF2-tuned; protein/NA prmtops will run but may want different
-  cutoffs/restraints. **Architectural carve-out:** the MD loop runs in
-  pmemd, not ASE. For Amber-deep workflows (REMD, MMPBSA, restraints,
+- **`scripts/run_amber.py`** — Runs Amber MD on a `.prmtop` (`--prmtop`)
+  / `.rst7` (`--rst`, not `--rst7`) pair. `--protocol standard` runs
+  min → heat (50 ps NVT, 0→300 K) → density (100 ps NPT) → prod (default
+  500 ps NPT). Engine auto-picks `pmemd.cuda` > `pmemd` > `sander`
+  (`--engine`). Outputs NetCDF `.nc`. v1.3 `mdin` defaults are
+  GAFF2-tuned (protein/NA prmtops run but may want different
+  cutoffs/restraints). For Amber-deep workflows (REMD, MMPBSA,
   restart/extend, implicit-GB), use `amber-chemist` instead.
 - **`scripts/gaussian_sp.py`** — DFT single-point E/F/dipole via
-  `ase.calculators.gaussian.Gaussian`; auto-falls back to g09 if g16
-  isn't on PATH. Mulliken charges and HOMO/LUMO eigenvalues parsed by
-  `_gaussian_log.py` (no cclib). **All of `--method`, `--basis`,
-  `--charge`, `--multiplicity`, `--mem`, `--nproc` are required — no
-  silent defaults**; surface a recommendation and confirm. SMD is the
-  documented water-solvent default.
+  `ase.calculators.gaussian.Gaussian` (g09 fallback). Mulliken charges
+  and HOMO/LUMO parsed by `_gaussian_log.py`. Required flags + SMD
+  default per Step-2 rule 8 — no silent defaults.
 - **`scripts/gaussian_opt.py`** — DFT geometry optimization via
   `GaussianOptimizer` (Gaussian's L103, one g16/g09 invocation).
   `--convergence` is a string (`loose`/`default`/`tight`/`verytight`),
   not a numeric eV/Å. Use `tight` or `verytight` if the optimized
   geometry feeds into a Freq job.
 - **`scripts/gaussian_freq.py`** — DFT frequency + thermochemistry
-  (vib_freqs / ZPE / enthalpy / Gibbs G), parsed by `_gaussian_log.py`
-  (no cclib). Reports imaginary modes as a warning + nonzero exit.
-  **Freq method/basis must match the optimization method/basis** — the
-  script doesn't enforce this; surface it to the user.
+  (vib_freqs / ZPE / enthalpy / Gibbs G) via `_gaussian_log.py`. Reports
+  imaginary modes (warning + nonzero exit). **Freq method/basis must
+  match the optimization** — not enforced; surface it.
 - **`scripts/_gaussian_log.py`** — Helper module: regex parsers for
   Gaussian .log fields ASE doesn't cover (vib_freqs, thermochem,
   Mulliken charges, MO eigenvalues). Imported by gaussian_sp.py and
@@ -302,106 +279,30 @@ Per-script use:
 
 ### Growing the skill: when to offer to bundle new scripts
 
-The default chain is: bundled script when one matches → inline code when
-none does. Add a third option: when the inline code looks like recurring
-work, **offer to promote it to a new bundled script**.
+When inline code looks like recurring work, offer to promote it to a
+bundled script. **Offer only when all hold:** the code is substantial
+(>~30 lines or a parametric workflow), no existing `scripts/` entry
+covers it, and the request reads as recurring ("for each molecule",
+"every time I get a new structure"). Don't offer for trivial one-shots,
+already-covered tasks, or exploratory/definitional questions.
 
-**Offer when ALL of these are true:**
-
-- The inline code is substantial — > ~30 lines, **or** it implements a
-  complete workflow with parameters worth exposing as CLI flags.
-- No existing script in `scripts/` covers the task type. (If one does,
-  point the user at it instead — don't make a duplicate.)
-- The user's request reads as recurring work — phrasing like "for each
-  molecule," "I'll run this on a bunch of systems," "every time I get a
-  new structure," or any other parametric framing.
-
-**Don't offer when:**
-
-- The inline code is trivial (< ~30 lines, single-purpose, e.g., a
-  small `ase.build` call).
-- The task is already covered by an existing script — point the user
-  there instead.
-- The request is one-shot exploratory ("what's the energy of this
-  molecule?") or conversational / definitional.
-
-**What the offer looks like.** End the response with a paragraph along
-these lines (adapt the specifics to the actual task):
-
-> I wrote this inline because no existing script in `scripts/` covers
-> [specific task]. If this is something you'll do repeatedly, I can
-> refactor it into `scripts/<name>.py` with proper argparse, a
-> docstring that explains when to reach for it, and a SKILL.md
-> §Scripts entry — and the next time you (or anyone using this skill)
-> hits the same task, the bundled script will be the default. Want me
-> to do that?
-
-**If the user says yes:**
-
-1. Refactor the inline code into `scripts/<descriptive_name>.py`. Use a
-   verb-based name following existing conventions (`optimize.py`,
-   `run_md.py`, `analyze_traj.py`).
-2. Add argparse with sensible defaults and useful `--help` text.
-3. Add a top-of-file docstring that explains **when** to reach for the
-   script — that's what helps future Claude sessions trigger it.
-4. Match output conventions of existing scripts (banner line on start,
-   tagged `[OK]` / `[INFO]` lines, plots/CSVs alongside the input,
-   meaningful exit codes).
-5. Add a one-line bullet to SKILL.md §Scripts in the same format as the
-   existing entries (`**Use for:** ...`).
-6. Run the new script with `--help` and one realistic example invocation
-   to verify it works. Report success or failure to the user.
-
-**If the user says no:** leave the inline code alone. Don't ask again
-in the same conversation.
-
-**Why this matters.** The skill grows by accretion of workflows that
-turn out to be recurring. Static curation can't anticipate every useful
-pattern. Asking the user is the cheapest, highest-signal way to find
-which inline patterns deserve promotion: every "yes" is direct evidence
-of a recurring need, every "no" is direct evidence the work was a
-one-off. Over time, `scripts/` becomes a frequency-weighted snapshot of
-what the skill is actually used for.
+If the user says yes: refactor into `scripts/<verb>.py` (naming like
+`optimize.py` / `run_md.py`) with argparse + a top-of-file docstring
+saying *when* to reach for it, match output conventions (banner, tagged
+`[OK]` / `[INFO]` lines, plots/CSVs alongside input, meaningful exit
+codes), add a one-line SKILL.md §Scripts bullet, and verify with
+`--help` + one example. If no, leave it and don't re-ask this session.
 
 ## References — read these on demand
 
-Each reference file is short and topic-scoped. Read the file when its topic
-comes up; do not preload them all.
+Each file is short and topic-scoped; read the one whose topic comes up.
 
-- **`references/ase_core.md`** — Read for: structure I/O (read/write,
-  formats), `ase.build` patterns, optimizer choice, MD integrators and
-  their constructor signatures, units (eV / Å / fs / kB), the Trajectory
-  format, NEB scaffolding.
-- **`references/xtb.md`** — Read for: tblite install, GFN1 vs GFN2 choice,
-  the standalone `xtb` binary (GFN0, GFN-FF), what observables xTB
-  exposes (energy, forces, dipole, HOMO-LUMO, Mulliken), known
-  limitations (transition metals, periodic systems).
-- **`references/analysis.md`** — Read for: when to use ASE's built-in
-  trajectory readers vs MDAnalysis, recipes for the analyses
-  `analyze_traj.py` implements, common pitfalls (alignment, periodic
-  unwrapping).
-- **`references/ml_potentials.md`** — Read for: when to reach for MACE
-  vs stay with xTB, the cross-validation contract (1 ps cadence,
-  MAE_F > 100 meV/Å abort), known MACE failure modes (liquid mixtures,
-  the ~1–2k atom GPU ceiling, OOD geometries), GPU/CPU notes,
-  troubleshooting (OOM, weight downloads).
-- **`references/amber.md`** — Read for: when GAFF2 wins over GFN2-xTB,
-  the antechamber → parmchk2 → tleap → pmemd pipeline, force-field
-  and water-model choices (GAFF2 vs GAFF, TIP3P vs OPC, AM1-BCC vs
-  RESP), engine selection (pmemd.cuda vs pmemd vs sander), known
-  failure modes (charge parity, antechamber aromatic perception, box
-  sizing), troubleshooting. Protein/NA MD via ff19SB+OPC / OL21 is
-  deferred to v2.3 — the `mdin` defaults in v1.3 are GAFF2-tuned.
-- **`references/gaussian.md`** — Read for: when Gaussian beats xTB,
-  the no-defaults policy + recommended method/basis choices
-  (ωB97X-D/def2-TZVP for organics, PBE0-D3(BJ)/def2-TZVP for TM),
-  SMD vs PCM solvation, g16 vs g09 differences, the in-house
-  `_gaussian_log.py` parser (vib_freqs, thermochem, Mulliken
-  charges, MO eigenvalues; NPA / Löwdin / Hirshfeld out of scope),
-  known failure modes (multiplicity
-  errors, solvation mismatch across SP/Opt/Freq chain, GAUSS_SCRDIR
-  issues), troubleshooting. Opt=TS / IRC / NBO / TDDFT / post-HF
-  are explicitly deferred to v3+.
+- **`references/ase_core.md`** — structure I/O, `ase.build`, optimizers, MD integrators, units, Trajectory format, NEB scaffolding.
+- **`references/xtb.md`** — tblite install, GFN1 vs GFN2, the standalone `xtb` binary (GFN0/GFN-FF), xTB observables, limitations.
+- **`references/analysis.md`** — ASE readers vs MDAnalysis, recipes for the `analyze_traj.py` analyses, pitfalls.
+- **`references/ml_potentials.md`** — MACE vs xTB, the cross-validation contract, MACE failure modes, the GPU ceiling, troubleshooting.
+- **`references/amber.md`** — when GAFF2 wins, the antechamber→parmchk2→tleap→pmemd pipeline, force-field/water choices, engine selection, failure modes. Protein/NA (ff19SB/OL21) deferred to v2.3.
+- **`references/gaussian.md`** — when Gaussian beats xTB, the no-defaults policy + recommended method/basis, SMD vs PCM, g16/g09, the `_gaussian_log.py` parser, failure modes. Opt=TS/IRC/NBO/TDDFT/post-HF deferred to v3+.
 
 **Smell test — don't fabricate technical semantics.** If you are
 about to write *"I think `<keyword>` defaults to ..."* or *"the
@@ -423,6 +324,8 @@ output.
   RATTLE/SHAKE elegantly, so 1 fs is the safer default).
 - **Friction (Langevin)**: 0.01 / fs is a reasonable thermostat coupling
   for production. Higher values (0.1 / fs) for fast equilibration.
+- **Nose-Hoover coupling**: `--tdamp 100 fs` is the default characteristic
+  timescale for the deterministic `nvt-nose-hoover` thermostat in `run_md.py`.
 - **Optimization tolerance**: `fmax=0.05 eV/Å` for production geometries;
   `0.01 eV/Å` for vibrational analysis input.
 - **Trajectory format**: prefer `.traj` (ASE binary, includes calculator
@@ -449,7 +352,9 @@ Be honest about scope. Deferrals:
   mismatch.
 - Gaussian `Opt=TS` / QST / IRC, anharmonic Freq, NBO/NPA, post-HF
   (CCSD/MP2/CASSCF), excited states (TDDFT/CIS/EOM-CCSD) → v3+; see
-  `references/gaussian.md` §7.
+  `references/gaussian_failure_modes.md` §"Out of scope". (Method strings pass to Gaussian
+  verbatim, so a post-HF route *runs*, but gets no method-specific
+  parsing or validation — prefer DFT.)
 - ML potentials beyond MACE (CHGNet, Orb-v3, M3GNet, SevenNet) →
   v2.2+; MACE-MP-0 covers most of the same scope today (see
   `references/ml_potentials.md`).

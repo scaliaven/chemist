@@ -148,6 +148,15 @@ def main() -> int:
         ladder=args.ladder, explicit=explicit,
     )
 
+    # pmemd's -rem 1 requires a strictly ascending ladder; an unsorted or
+    # descending --temps list would also make the gap check below compute
+    # negative gaps and silently skip the spread warning.
+    if any(temps[i + 1] <= temps[i] for i in range(len(temps) - 1)):
+        raise SystemExit(
+            "[remd] temperature ladder must be strictly ascending; got "
+            f"{[round(t, 2) for t in temps]}. Sort --temps low->high."
+        )
+
     # Spread sanity: warn if any pair-gap exceeds 50 K (acceptance will be poor).
     gaps = [temps[i + 1] - temps[i] for i in range(len(temps) - 1)]
     max_gap = max(gaps)
