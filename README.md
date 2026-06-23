@@ -206,6 +206,9 @@ Each skill has **three** copies: dev source (edit here), the project copy, and t
 - [`PLAN.md`](PLAN.md) — phase sequencing for v2 work on
   `ase-chemist`, the v2 vision proposal, and decisions deferred to
   usage data.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — decision memo on the
+  paradigm: why this is shipped as skills rather than agents or an
+  MCP server, with an optional de-duplication refactor sketch.
 - [`CLAUDE.md`](CLAUDE.md) — load-bearing design decisions for
   Claude Code sessions working in this repo. The skill-copy
   duplication rules (now applied to **both** skills), the
