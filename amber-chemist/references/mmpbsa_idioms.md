@@ -77,19 +77,23 @@ Add `&decomp`:
 
 ## Computational alanine scan
 
-Add `&alanine_scanning`:
+One mutation per run, and you supply the mutant. Build a topology in
+which a single interface residue is mutated to alanine (`tleap`,
+ParmEd, or `ante-MMPBSA.py`), then pass it alongside the wild-type
+prmtops — `-mr <mutant_receptor>` and/or `-ml <mutant_ligand>`
+(optionally `-mc <mutant_complex>`) — and add the namelist:
 ```
 &alanine_scanning
 /
 ```
 
-(No parameters needed.) MMPBSA.py mutates each interface residue to
-alanine in silico and re-evaluates the binding energy. The
-"ΔΔG_ala" tells you which residues contribute most to binding.
-
-Common scope-narrowing: combine with `&general start/end` to focus
-on a particular interface region, or use ParmEd to manually
-pre-truncate the prmtop to interface-only residues.
+(`mutant_only=1` is the lone option — score the mutant only.) MMPBSA.py
+evaluates wild-type and mutant on the same trajectory and prints
+ΔΔG_ala = ΔG_mutant − ΔG_wild-type for that residue. It does **not**
+enumerate the interface for you: scan N residues with N mutant
+topologies and N runs. Omitting the mutant is a hard error
+("Alanine scanning requires either a mutated receptor or mutated
+ligand topology file!").
 
 ## MPI variant
 
@@ -136,8 +140,9 @@ do not report absolute ΔG_bind from QH-entropy.
 - → `amber_score.py --method gb --gb-model 2`
 
 ### Hot-spot identification
-- GB + alanine scan; cite the per-residue ΔΔG_ala.
-- → `amber_score.py --method gb --alanine-scan`
+- GB + alanine scan, one mutant residue per run; cite ΔΔG_ala.
+- → `amber_score.py --method gb --alanine-scan \`
+  `--mutant-receptor-prmtop rec_R100A.prmtop` (repeat per residue)
 
 ### Antibody-antigen with high charge
 - PB only (or GB+PB), salt at the experimental ionic strength,
@@ -155,7 +160,7 @@ mmpbsa/
   <prefix>.in                    # MMPBSA input deck
   FINAL_RESULTS_MMPBSA.dat       # primary output
   FINAL_DECOMP_MMPBSA.dat        # if --per-residue
-  ALANINE_SCAN.dat               # if --alanine-scan
+  # --alanine-scan: WT, MUTANT and ΔΔG all land in FINAL_RESULTS_MMPBSA.dat
   <prefix>_summary.json          # parsed delta-G + metadata
   ... (additional MMPBSA.py outputs if --keep-files)
 ```
@@ -168,8 +173,9 @@ machine consumption.
 - "Topology mismatch between -cp and -y" — trajectory is from a
   different system.
 - "No frames after stripping" — `--solvated-prmtop` not set.
-- "alanine_scan finds no residues" — interface residues not in both
-  ligand/receptor selections.
+- "Alanine scanning requires either a mutated receptor or mutated
+  ligand topology file!" — pass a one-residue→ALA mutant prmtop via
+  `-mr`/`-ml`/`-mc` (`--mutant-receptor-prmtop` / `--mutant-ligand-prmtop`).
 
 ## Reference manual
 

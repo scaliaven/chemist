@@ -52,7 +52,8 @@ trajectory. Always use `--extend` for same-stage continuation.
 ## Restraints
 
 `--restraint-mask <amber-mask>` + `--restraint-weight <kcal/mol/Å²>`
-adds a `&restraint` block:
+adds positional-restraint keywords to the `&cntrl` namelist (Amber has no
+separate `&restraint` namelist for these):
 
 ```
 ntr=1, restraintmask='@CA,C,N&!@H=', restraint_wt=10.0,

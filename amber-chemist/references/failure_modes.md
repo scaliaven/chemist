@@ -151,11 +151,15 @@ strip.
 variant. `which mpirun` should match the one used during the
 AmberTools build.
 
-### "alanine_scan finds no residues"
-**Cause:** interface residues need to be in both receptor and ligand
-selection; the prmtops may not have the right atoms.
-**Fix:** check the prmtops with `parmed -p complex.prmtop` and `print`
-the relevant residues.
+### "Alanine scanning requires either a mutated receptor or mutated ligand topology file!"
+**Cause:** `&alanine_scanning` / `--alanine-scan` was set without a
+mutant topology. MMPBSA.py does not auto-mutate — it diffs your
+wild-type prmtop against a mutant prmtop in which exactly one residue
+is alanine, one mutation per run.
+**Fix:** build the mutant (`tleap` / ParmEd / `ante-MMPBSA.py`, one
+residue → ALA) and pass it via `-mr`/`-ml`/`-mc`
+(`--mutant-receptor-prmtop` / `--mutant-ligand-prmtop`). Scan multiple
+residues with one mutant + one run each.
 
 ## Environment (`check_env.py`)
 

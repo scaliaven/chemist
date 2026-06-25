@@ -26,6 +26,11 @@
   </sub>
 </p>
 
+> **Heads up — still in active development.** Expect rough edges and
+> sizeable changes between releases; issue reports are welcome. A third
+> `openmm-chemist` sibling is planned eventually — for now the focus is
+> these two.
+
 ---
 
 ## What this is
@@ -168,9 +173,61 @@ Each skill has **three** copies: dev source (edit here), the project copy, and t
 
 ## Project documentation
 
-- **`ase-chemist`** — [`README.md`](ase-chemist/README.md) (user-facing: backends, examples, install) · [`SKILL.md`](ase-chemist/SKILL.md) (trigger contract + method-selection tree) · [`references/`](ase-chemist/references/) (scoped reference files).
-- **`amber-chemist`** — [`README.md`](amber-chemist/README.md) · [`SKILL.md`](amber-chemist/SKILL.md) · [`references/`](amber-chemist/references/) (`md_core`, `remd`, `scoring`, `failure_modes`, …).
-- **Repo-level** — [`CLAUDE.md`](CLAUDE.md) for load-bearing design decisions and the three-copy sync rules.
+**`ase-chemist`:**
+
+- [`ase-chemist/README.md`](ase-chemist/README.md) — the skill's
+  user-facing README. Backends, examples, design principles, install.
+  **Read this first if you want to understand what the skill does.**
+- [`ase-chemist/SKILL.md`](ase-chemist/SKILL.md) — the trigger
+  contract (description field), method-selection tree, scripts
+  catalog. Editing the description field regresses or improves
+  activation; treat it as load-bearing.
+- [`ase-chemist/references/`](ase-chemist/references/) — 15 small
+  scoped reference files (1–4k chars each). `ml_potentials.md` and
+  `gaussian.md` are thin indices pointing at sub-files; `amber.md`
+  is a single self-contained file (the v1.3 carve-out is small
+  enough not to need splitting, and deep Amber lives in the sibling
+  `amber-chemist` skill). Read only the file that matches your task.
+
+**`amber-chemist`:**
+
+- [`amber-chemist/README.md`](amber-chemist/README.md) — the skill's
+  user-facing README. What v1.0 ships, what's deferred, layout, and
+  the carve-out relationship with `ase-chemist`'s v1.3 Amber path.
+- [`amber-chemist/SKILL.md`](amber-chemist/SKILL.md) — the trigger
+  contract and method-selection tree (single-replica MD, T-REMD,
+  add-ons, escape hatches).
+- [`amber-chemist/references/`](amber-chemist/references/) — 15
+  topic-scoped reference files (`md_core`, `remd`, `force_fields`,
+  `analysis`, `scoring`, `failure_modes`, `extension_map`, …).
+
+**Repo-level:**
+
+- [`PLAN.md`](PLAN.md) — phase sequencing for v2 work on
+  `ase-chemist`, the v2 vision proposal, and decisions deferred to
+  usage data.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — decision memo on the
+  paradigm: why this is shipped as skills rather than agents or an
+  MCP server, with an optional de-duplication refactor sketch.
+- [`CLAUDE.md`](CLAUDE.md) — load-bearing design decisions for
+  Claude Code sessions working in this repo. The skill-copy
+  duplication rules (now applied to **both** skills), the
+  load-bearing carve-outs, the what-NOT-to-touch list.
+
+## Plans
+
+- **`openmm-chemist`** — eventual third sibling skill. No timeline yet;
+  listed here so it isn't forgotten.
+- **No plans for ORCA or Gromacs.** Both are free and arguably more
+  popular than what ships here, but I don't have the bandwidth and
+  wasn't familiar with either when I started. Rough guidance if you're
+  picking a tool for your own work:
+  - **MD / sampling** → OpenMM (or `amber-chemist` here, if you're
+    already in the AMBER ecosystem).
+  - **QM calculations** (geometry optimization, single points,
+    frequencies) → Gaussian (`ase-chemist` v1.4 drives it).
+  - **In between** — depends on system size vs. accuracy needed.
+    Small + high accuracy → Gaussian. Large + lower accuracy → OpenMM.
 
 ---
 

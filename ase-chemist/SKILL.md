@@ -148,7 +148,8 @@ Apply the first rule that fits the system, in this order:
    on relative energies and is unreliable on transition metals;
    DFT is the right tool. **No method/basis defaults** — surface a
    recommendation (ωB97X-D/def2-TZVP for organics; PBE0-D3(BJ)/def2-
-   TZVP for transition metals; see `references/gaussian.md` §1) and
+   TZVP for transition metals; see
+   `references/gaussian_method_selection.md`) and
    confirm before running. The scripts also require explicit
    `--charge`, `--mult`, `--mem`, `--nproc`. Solvent → SMD by
    default. Thermochem parsing is in-house (`_gaussian_log.py`),
@@ -351,7 +352,7 @@ Be honest about scope. Deferrals:
   mismatch.
 - Gaussian `Opt=TS` / QST / IRC, anharmonic Freq, NBO/NPA, post-HF
   (CCSD/MP2/CASSCF), excited states (TDDFT/CIS/EOM-CCSD) → v3+; see
-  `references/gaussian.md` §7. (Method strings pass to Gaussian
+  `references/gaussian_failure_modes.md` §"Out of scope". (Method strings pass to Gaussian
   verbatim, so a post-HF route *runs*, but gets no method-specific
   parsing or validation — prefer DFT.)
 - ML potentials beyond MACE (CHGNet, Orb-v3, M3GNet, SevenNet) →

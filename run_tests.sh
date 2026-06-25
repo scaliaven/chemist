@@ -7,9 +7,38 @@ set -uo pipefail
 OUT=results
 mkdir -p "$OUT"
 
-# Non-gating environment summary; helps interpret skill behavior in logs.
-if [ -x "$(command -v python)" ]; then
-  python amber-chemist/scripts/check_env.py --summary-only > "$OUT/amber-chemist_env.txt" 2>&1 || true
+# --- Make the real simulation engines visible to the nested `claude -p`
+# sessions this harness spawns, so each skill's check_env.py reports what the
+# box can actually run (ASE/tblite, AmberTools, Gaussian). Best-effort: every
+# step is guarded so a missing module/env never aborts the harness. `set -u`
+# is relaxed here because conda/Lmod init scripts reference unset vars.
+# Override any path via the environment if you run this on a different box.
+setup_chem_env () {
+  set +u
+  [ -f /usr/share/lmod/lmod/init/bash ] && source /usr/share/lmod/lmod/init/bash >/dev/null 2>&1
+  [ -f "${CONDA_SH:-/gpfsnyu/packages/miniconda/2023.2.7/etc/profile.d/conda.sh}" ] && \
+    source "${CONDA_SH:-/gpfsnyu/packages/miniconda/2023.2.7/etc/profile.d/conda.sh}" >/dev/null 2>&1
+  conda activate "${ASE_ENV:-ase_skill}" >/dev/null 2>&1               # ASE + tblite + MDAnalysis -> `python`
+  module load "${AMBER_MODULE:-amber/22-oneapi-2022.0.1}" >/dev/null 2>&1  # full AmberTools + CPU pmemd
+  conda activate "${ASE_ENV:-ase_skill}" >/dev/null 2>&1               # re-assert ASE python ahead of amber's
+  export g09root="${G09ROOT:-/gpfsnyu/scratch/hh3043}"                 # Gaussian g09 (personal install)
+  source "$g09root/g09/bsd/g09.profile" >/dev/null 2>&1
+  set -u
+}
+setup_chem_env
+
+# Pick a python that can actually import ASE (the conda env above provides one);
+# fall back to whatever python3/python exists so the summary still runs elsewhere.
+PYBIN=""
+for _c in python python3; do
+  if command -v "$_c" >/dev/null 2>&1 && "$_c" -c "import ase" >/dev/null 2>&1; then PYBIN="$_c"; break; fi
+done
+[ -z "$PYBIN" ] && PYBIN="$(command -v python3 || command -v python || true)"
+
+# Non-gating capability summary for BOTH skills; helps interpret skill behavior in logs.
+if [ -n "$PYBIN" ]; then
+  "$PYBIN" ase-chemist/scripts/check_env.py                  > "$OUT/ase-chemist_env.txt"   2>&1 || true
+  "$PYBIN" amber-chemist/scripts/check_env.py --summary-only > "$OUT/amber-chemist_env.txt" 2>&1 || true
 fi
 
 # Per-run wall-clock limit. 180s is enough for Claude to read SKILL.md,
@@ -17,6 +46,11 @@ fi
 # run a real MD simulation, which is what we want — we're testing whether
 # the skill produces correct code, not whether the code finishes executing.
 TIMEOUT_SECS="${TIMEOUT_SECS:-180}"
+
+# How many `claude -p` sessions to run concurrently. Each prompt writes to its
+# own per-id log/status file, so parallel runs never clobber each other. Keep
+# this modest to stay clear of API rate limits; raise it if your limits allow.
+MAX_PAR="${MAX_PAR:-5}"
 
 # Detect which timeout binary we have. macOS lacks GNU `timeout` by default;
 # `gtimeout` is provided by `brew install coreutils`. On Linux, plain `timeout`.
@@ -29,7 +63,7 @@ else
   exit 1
 fi
 
-run_one () {
+_run_one_impl () {
   local id="$1" expected="$2" prompt="$3"
   local logf="$OUT/${id}.log"
   local statusf="$OUT/${id}.status"
@@ -56,6 +90,13 @@ run_one () {
 
   echo "  done -> $logf  (rc=$rc, ${elapsed}s, $(cat "$statusf"))"
 }
+
+# Block until fewer than MAX_PAR background sessions are running.
+_throttle () { while [ "$(jobs -rp | wc -l)" -ge "$MAX_PAR" ]; do wait -n; done; }
+
+# Public entry point: launch each prompt in the background, then wait for a
+# free slot. Call sites below are unchanged; concurrency is transparent.
+run_one () { _run_one_impl "$@" & _throttle; }
 
 # Format: id | expected | prompt
 run_one p1_method_named  trigger     "I have test-inputs/caffeine.xyz. Optimize it with GFN2-xTB and tell me the HOMO-LUMO gap. Don't actually run the simulation — just write the script I would run."
@@ -148,6 +189,9 @@ run_one r10_radgyr          trigger     "I'd like to track radius of gyration vs
 #      as the available approximation is a reasonable redirect.
 run_one rX1_drug_in_water   borderline  "I want to understand how my drug moves around in water over a few nanoseconds. What's the right tool here? Don't execute."
 run_one rX2_fep_binding     borderline  "Compute the absolute binding free energy of my ligand to its protein target. Don't execute."
+
+# Wait for every backgrounded session to finish before tallying results.
+wait
 
 # Quick summary so you know at a glance what to investigate.
 echo

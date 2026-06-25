@@ -16,7 +16,7 @@ When NOT to use:
 
 Defaults policy (v1.4):
     No method/basis defaults — same as gaussian_sp.py. See
-    references/gaussian.md §1 for the recommended choices.
+    references/gaussian_method_selection.md for the recommended choices.
 
 Convergence flag:
     GaussianOptimizer's `fmax` is a STRING ('loose' / 'default' /
