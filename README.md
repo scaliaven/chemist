@@ -11,6 +11,7 @@
   <sub>
     <a href="ase-chemist/">ase-chemist</a> &nbsp;·&nbsp;
     <a href="amber-chemist/">amber-chemist</a> &nbsp;·&nbsp;
+    <a href="docs/">website</a> &nbsp;·&nbsp;
     <a href="run_tests.sh">test harness</a>
   </sub>
 </p>
