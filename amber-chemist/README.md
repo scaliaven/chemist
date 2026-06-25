@@ -13,7 +13,7 @@ analysis and MMPBSA endpoint scoring as add-ons.
 - `--restart` chains stages (heat → density → prod). `--extend` chains chunks of the same stage (auto-numbered `prod_2.{nc,rst7,mdout}`, `_3`, …).
 - Restraints: `--restraint-mask` + `--restraint-weight` for positional restraints during heating / density (and prod if you want).
 - Barostats: `--barostat {berendsen, monte_carlo, off}`. Berendsen is the equilibration default; Monte Carlo is the better choice for production NPT.
-- Solvation: explicit (TIP3P / OPC / SPCE / TIP4P-Ew) or implicit GB (`--implicit-solvent {gb1, gb2, gb5, gb7, gb8}`; default `gb2` = OBC model I (igb=2); GBneck2 is `gb8` (igb=8)). Implicit means `ntb=0, igb=N, cut=999`, no barostat.
+- Solvation: explicit (TIP3P / OPC / SPCE / TIP4P-Ew) or implicit GB. On `amber_md.py`, `--implicit-solvent {gb1, gb2, gb5, gb7, gb8}` is opt-in (default `off`); when set, `gb2` = OBC model I (igb=2) is the recommended model and GBneck2 is `gb8` (igb=8). Easy mode (`amber_run.py --mode implicit`) defaults to `gb2`. Implicit means `ntb=0, igb=N, cut=999`, no barostat.
 - Engine: auto `pmemd.cuda > pmemd > sander`. `--engine` overrides.
 - `--from-prmtop`: skip prep entirely when the user already has a prmtop (CHARMM-GUI, external prep). All MD entry points support it.
 

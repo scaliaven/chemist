@@ -1,155 +1,456 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="chemist: Claude Code skills for computational chemistry method selection, ASE workflows, Amber MD, Gaussian DFT, and ML potential validation.">
-    <title>chemist | Computational Chemistry Skills</title>
-    <link rel="stylesheet" href="styles.css">
-  </head>
-  <body>
-    <header class="site-header">
-      <a class="brand" href="#top" aria-label="chemist home">
-        <span class="brand-mark" aria-hidden="true">C</span>
-        <span>chemist</span>
-      </a>
-      <nav aria-label="Primary">
-        <a href="#skills">Skills</a>
-        <a href="#methods">Methods</a>
-        <a href="#install">Install</a>
-        <a href="https://github.com/scaliaven/chemist">GitHub</a>
-      </nav>
-    </header>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>chemist — the router that refuses plausible-wrong methods</title>
+<meta name="description" content="Two Claude Code Agent Skills for computational chemistry. Method selection that refuses plausible wrong answers — the right method for the system, with honest limits over silent fallbacks.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#top">Skip to content</a>
 
-    <main id="top">
-      <section class="hero">
-        <div class="hero-copy">
-          <p class="eyebrow">Claude Code skills for computational chemistry</p>
-          <h1>Method selection that refuses plausible wrong answers.</h1>
-          <p class="lede">
-            Two sibling skills route simulation requests through ASE, AmberTools,
-            MACE, xTB, and Gaussian with explicit limits, install checks, and
-            validation rules before any calculation starts.
-          </p>
-          <div class="hero-actions" aria-label="Primary links">
-            <a class="button primary" href="https://github.com/scaliaven/chemist">View on GitHub</a>
-            <a class="button" href="#install">Install skills</a>
-          </div>
-        </div>
-        <figure class="hero-visual">
-          <img src="assets/chemist-workflow.png" alt="Workflow visualization connecting molecular geometry, method routing, validation, and simulation outputs.">
-        </figure>
-      </section>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark">[ chemist ]</span>
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="#routed">Routing</a>
+      <a href="#backends">Backends</a>
+      <a href="#skills">Skills</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/scaliaven/chemist">GitHub</a>
+    </nav>
+  </div>
+</header>
 
-      <section class="section compact" aria-labelledby="why-title">
-        <div class="section-heading">
-          <p class="eyebrow">Why it exists</p>
-          <h2 id="why-title">A router for chemistry judgment, not a black box.</h2>
-        </div>
-        <div class="principles">
-          <article>
-            <h3>Right method for the system</h3>
-            <p>Organic, metallic, protein-like, and large ML-potential cases take different paths, even when the user asks the same plain-language question.</p>
-          </article>
-          <article>
-            <h3>Limits stated up front</h3>
-            <p>xTB size cliffs, Gaussian license gates, Amber scope, and ML potential uncertainty are surfaced as part of the answer.</p>
-          </article>
-          <article>
-            <h3>Validation before confidence</h3>
-            <p>MACE MD is cross-validated against GFN2-xTB every 1 ps by default and aborts when the force error crosses the documented threshold.</p>
-          </article>
-        </div>
-      </section>
+<main id="top">
 
-      <section class="section" id="skills" aria-labelledby="skills-title">
-        <div class="section-heading">
-          <p class="eyebrow">Sibling skills</p>
-          <h2 id="skills-title">Two focused surfaces, one design contract.</h2>
-        </div>
-        <div class="skill-grid">
-          <article class="skill-card">
-            <p class="tag">ASE, xTB, MACE, Gaussian</p>
-            <h3>ase-chemist</h3>
-            <p>Atomistic and molecular simulation through ASE with seven backends, explicit Gaussian method inputs, and ML potential validation.</p>
-            <ul>
-              <li>Geometry optimization and molecular dynamics</li>
-              <li>GFN2-xTB, MACE-MP-0, MACE-OFF, EMT, LJ, TIP3P</li>
-              <li>Gaussian single-point, optimization, frequency, and thermochemistry</li>
-            </ul>
-            <a href="https://github.com/scaliaven/chemist/tree/main/ase-chemist">Read ase-chemist docs</a>
-          </article>
-          <article class="skill-card">
-            <p class="tag">AmberTools, pmemd, cpptraj</p>
-            <h3>amber-chemist</h3>
-            <p>Amber-native MD for workflows where restart handling, T-REMD, implicit solvent, cpptraj analysis, and MMPBSA matter.</p>
-            <ul>
-              <li>Single-replica MD with restart and extension</li>
-              <li>Temperature replica-exchange MD with demux support</li>
-              <li>Endpoint scoring, alanine scans, and trajectory analysis</li>
-            </ul>
-            <a href="https://github.com/scaliaven/chemist/tree/main/amber-chemist">Read amber-chemist docs</a>
-          </article>
-        </div>
-      </section>
+  <!-- HERO: thesis + lede + actions (left), interactive routing trace (right) -->
+  <section class="hero" id="hero">
+    <div class="wrap hero-grid">
 
-      <section class="section methods" id="methods" aria-labelledby="methods-title">
-        <div class="section-heading">
-          <p class="eyebrow">Backends</p>
-          <h2 id="methods-title">The route depends on chemistry, scale, and installed tools.</h2>
+      <div class="hero-copy">
+        <p class="eyebrow">// two Claude Code Agent Skills · computational chemistry</p>
+        <h1 class="hero-headline">The router that refuses<br>plausible-wrong methods.</h1>
+        <p class="lede">
+          Method selection that picks the right method for the <em>system</em> — not for whatever
+          you happened to type. Honest limits over silent fallbacks. EMT on an organic returns
+          plausible nonsense, so it gets caught before you ever see it.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="#routed">See a request get routed</a>
+          <a class="btn btn-secondary" href="https://github.com/scaliaven/chemist">Read on GitHub</a>
         </div>
-        <div class="method-table" role="table" aria-label="Supported computational chemistry backends">
-          <div class="table-row table-head" role="row">
-            <span role="columnheader">Backend</span>
-            <span role="columnheader">Reach for it when</span>
-            <span role="columnheader">Skill</span>
-          </div>
-          <div class="table-row" role="row">
-            <span role="cell">GFN2-xTB</span>
-            <span role="cell">Organic and main-group systems up to the practical xTB size cliff.</span>
-            <span role="cell">ase-chemist</span>
-          </div>
-          <div class="table-row" role="row">
-            <span role="cell">MACE</span>
-            <span role="cell">Larger organic or materials MD, guarded by mandatory xTB cross-validation.</span>
-            <span role="cell">ase-chemist</span>
-          </div>
-          <div class="table-row" role="row">
-            <span role="cell">Gaussian DFT</span>
-            <span role="cell">Publication-grade SP, optimization, frequency, and thermochemistry.</span>
-            <span role="cell">ase-chemist</span>
-          </div>
-          <div class="table-row" role="row">
-            <span role="cell">Amber</span>
-            <span role="cell">Production MD, T-REMD, implicit solvent, cpptraj analysis, and MMPBSA.</span>
-            <span role="cell">amber-chemist</span>
-          </div>
-        </div>
-      </section>
+        <p class="hero-foot eyebrow">// MIT · active development — rough edges expected</p>
+      </div>
 
-      <section class="section split" id="install" aria-labelledby="install-title">
-        <div class="section-heading">
-          <p class="eyebrow">Install</p>
-          <h2 id="install-title">Bring only the chemistry stack you need.</h2>
+      <!-- SIGNATURE 1: interactive method-selection trace -->
+      <div class="trace" id="trace">
+        <div class="trace-head">
+          <span class="trace-title">method-selection&nbsp;trace</span>
+          <span class="trace-sub eyebrow">// request in · backend out</span>
         </div>
-        <div class="install-panels">
-          <article>
-            <h3>ase-chemist core</h3>
-            <pre><code>conda install -c conda-forge ase tblite-python mdanalysis matplotlib numpy
-python ase-chemist/scripts/check_env.py</code></pre>
-          </article>
-          <article>
-            <h3>amber-chemist core</h3>
-            <pre><code>conda install -c conda-forge ambertools
-python amber-chemist/scripts/check_env.py</code></pre>
-          </article>
-        </div>
-      </section>
-    </main>
 
-    <footer class="site-footer">
-      <span>MIT licensed.</span>
-      <a href="https://github.com/scaliaven/chemist">github.com/scaliaven/chemist</a>
-    </footer>
-  </body>
+        <!-- segmented control / tablist of the four example requests -->
+        <div class="seg" role="tablist" aria-label="Example requests">
+          <button class="seg-btn" role="tab" id="tab-1" aria-controls="panel-1" aria-selected="true"  tabindex="0">req&nbsp;1</button>
+          <button class="seg-btn" role="tab" id="tab-2" aria-controls="panel-2" aria-selected="false" tabindex="-1">req&nbsp;2</button>
+          <button class="seg-btn" role="tab" id="tab-3" aria-controls="panel-3" aria-selected="false" tabindex="-1">req&nbsp;3</button>
+          <button class="seg-btn" role="tab" id="tab-4" aria-controls="panel-4" aria-selected="false" tabindex="-1">req&nbsp;4</button>
+        </div>
+
+        <!-- PANEL 1 -->
+        <div class="trace-panel" role="tabpanel" id="panel-1" aria-labelledby="tab-1" tabindex="0">
+          <p class="req">&gt; Run NVT MD on a 5000-atom organic system at 300 K.</p>
+          <ul class="tree">
+            <li class="rej"><span class="branch">├─</span><span class="tag tag-rej">REJECTED</span><span class="be">EMT</span><span class="reason">wrong physics for organics</span></li>
+            <li class="rej"><span class="branch">├─</span><span class="tag tag-rej">REJECTED</span><span class="be">GFN2-xTB</span><span class="reason">past the ~1k-atom size cliff</span></li>
+            <li class="sel"><span class="branch">└─</span><span class="tag tag-sel">SELECTED</span><span class="be">MACE-OFF</span><span class="reason">pure-organic foundation model</span></li>
+          </ul>
+          <p class="contract"><span class="tag tag-ceil">CONTRACT</span> cross-validate vs GFN2-xTB every 1 ps · abort if MAE_F &gt; 100 meV/Å</p>
+        </div>
+
+        <!-- PANEL 2 -->
+        <div class="trace-panel" role="tabpanel" id="panel-2" aria-labelledby="tab-2" tabindex="0" hidden>
+          <p class="req">&gt; Optimize caffeine, report the HOMO–LUMO gap.</p>
+          <ul class="tree">
+            <li class="rej"><span class="branch">├─</span><span class="tag tag-rej">REJECTED</span><span class="be">EMT</span><span class="reason">no electronic structure</span></li>
+            <li class="sel"><span class="branch">└─</span><span class="tag tag-sel">SELECTED</span><span class="be">GFN2-xTB</span><span class="reason">fast main-group electronic structure</span></li>
+          </ul>
+          <p class="contract"><span class="tag tag-ceil">CONTRACT</span> HOMO–LUMO returned as the raw eigenvalue gap · convention noted in references</p>
+        </div>
+
+        <!-- PANEL 3 -->
+        <div class="trace-panel" role="tabpanel" id="panel-3" aria-labelledby="tab-3" tabindex="0" hidden>
+          <p class="req">&gt; Run 1 ns of explicit-solvent MD on a ligand in water.</p>
+          <ul class="tree">
+            <li class="rej"><span class="branch">├─</span><span class="tag tag-rej">REJECTED</span><span class="be">GFN2-xTB</span><span class="reason">too slow for ns-scale solvated MD</span></li>
+            <li class="sel"><span class="branch">└─</span><span class="tag tag-sel">SELECTED</span><span class="be">Amber + GAFF2</span><span class="reason">AM1-BCC → tleap → pmemd; min → heat → density → prod</span></li>
+          </ul>
+          <p class="contract"><span class="tag tag-ceil">CONTRACT</span> hand off to amber-chemist for restart / T-REMD / MMPBSA</p>
+        </div>
+
+        <!-- PANEL 4 -->
+        <div class="trace-panel" role="tabpanel" id="panel-4" aria-labelledby="tab-4" tabindex="0" hidden>
+          <p class="req">&gt; Compute G₂₉₈ at B3LYP-D3 / def2-TZVP.</p>
+          <ul class="tree">
+            <li class="rej"><span class="branch">├─</span><span class="tag tag-rej">REFUSED</span><span class="be">silent defaults</span><span class="reason">no method/basis picked for you</span></li>
+            <li class="sel"><span class="branch">└─</span><span class="tag tag-sel">SELECTED</span><span class="be">Gaussian Opt → Freq</span><span class="reason">once method / basis / charge / multiplicity are given</span></li>
+          </ul>
+          <p class="contract"><span class="tag tag-ceil">CONTRACT</span> ZPE, enthalpy, Gibbs at 298 K · parsed in-house (no cclib)</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- SIGNATURE 2: annotated claude -p session (the "why" in the open) -->
+  <section class="band session-band" id="routed" aria-labelledby="routed-h">
+    <div class="wrap">
+      <h2 id="routed-h" class="section-h">One request, routed in the open.</h2>
+      <p class="section-lede">No black box. The skill walks the decision out loud — what it rejects, what it selects, and the reason you can audit. Here is request&nbsp;3, line by line.</p>
+
+      <div class="session">
+        <div class="session-term">
+          <div class="term-bar">
+            <span class="term-name">claude -p · routing trace</span>
+          </div>
+          <ol class="log">
+            <li class="logline"><span class="ln" aria-hidden="true">1</span><span class="lc"><span class="sh">$</span> claude -p <span class="str">"Run 1 ns of explicit-solvent MD on a ligand in water"</span></span></li>
+            <li class="logline"><span class="ln" aria-hidden="true">2</span><span class="lc"><span class="mut">· loading skill</span> <span class="rt">ase-chemist</span> <span class="mut">· check_env.py …</span> <span class="ok">[SUMMARY] ambertools, tblite ok</span></span></li>
+            <li class="logline"><span class="ln" aria-hidden="true">3</span><span class="lc"><span class="pr">&gt;</span> <span class="rej-t">REJECT</span> GFN2-xTB <span class="mut">— too slow for ns-scale solvated MD</span></span></li>
+            <li class="logline"><span class="ln" aria-hidden="true">4</span><span class="lc"><span class="pr">&gt;</span> <span class="sel-t">SELECT</span> <span class="rt">Amber + GAFF2</span>  <span class="mut">AM1-BCC → tleap → pmemd · min → heat → density → prod</span></span></li>
+            <li class="logline"><span class="ln" aria-hidden="true">5</span><span class="lc"><span class="pr">&gt;</span> hand off to <span class="rt">amber-chemist</span> <span class="mut">— restart · T-REMD · MMPBSA</span></span></li>
+          </ol>
+        </div>
+
+        <aside class="session-notes" aria-label="Annotations">
+          <p class="snote snote-rej"><span class="snote-k">↖ line 3</span> Not “xTB is bad” — it’s the default for organics. It just can’t buy you a nanosecond of solvent in any sane wall-clock. The refusal is about <em>budget</em>, not snobbery.</p>
+          <p class="snote snote-sel"><span class="snote-k">↖ line 4</span> The selected route. GAFF2 + AM1-BCC charges is the small-molecule production path — and the four stages aren’t decoration, they’re how you reach equilibrium density before trusting a single frame.</p>
+          <p class="snote"><span class="snote-k">↖ line 5</span> Two skills, one ladder. In Amber-native territory the sibling owns restart/extend, replica exchange and endpoint scoring. The router knows where it ends.</p>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- BACKENDS: the one documented size cliff (figure) + spec table -->
+  <section class="band backends" id="backends" aria-labelledby="backends-h">
+    <div class="wrap">
+      <h2 id="backends-h" class="section-h">Seven backends. Eight honest ceilings.</h2>
+      <p class="section-lede">Most ceilings are about chemistry or scope, not size — they live in the <span class="ceil-key">Ceiling</span> column below. The one place raw <em>size</em> decides the route is the xTB&nbsp;→&nbsp;MACE handoff, plotted here.</p>
+
+      <!-- SIGNATURE 3: the documented size cliff (truthful — only xTB and MACE plotted) -->
+      <figure class="axis-fig" aria-labelledby="axis-cap">
+        <figcaption class="axis-cap" id="axis-cap"><span class="fig-label">FIG 1</span> The one size cliff: GFN2-xTB hands off to MACE near ~1k atoms. Every boundary drawn here is documented; other backends are bounded by chemistry, not size.</figcaption>
+        <div class="axis-scroll" role="group" aria-label="Logarithmic axis of system size. GFN2-xTB is practical up to about one thousand atoms, the documented size cliff. MACE picks up past the cliff and is comfortable to about one to two thousand atoms on a 40 gigabyte GPU, GPU-bound beyond that.">
+          <svg viewBox="0 0 760 250" class="axis-svg" role="img" aria-hidden="true">
+            <defs>
+              <pattern id="cliffHatch" width="7" height="7" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+                <rect width="7" height="7" fill="none"/>
+                <line x1="0" y1="0" x2="0" y2="7" class="hatch-line"/>
+              </pattern>
+            </defs>
+
+            <g class="grid">
+              <line x1="80"  y1="48" x2="80"  y2="186"/>
+              <line x1="240" y1="48" x2="240" y2="186"/>
+              <line x1="400" y1="48" x2="400" y2="186"/>
+              <line x1="560" y1="48" x2="560" y2="186"/>
+              <line x1="720" y1="48" x2="720" y2="186"/>
+            </g>
+
+            <!-- "xTB can't go here" zone, past the cliff -->
+            <rect x="400" y="48" width="320" height="138" fill="url(#cliffHatch)"/>
+            <line x1="400" y1="42" x2="400" y2="192" class="cliff-line"/>
+
+            <!-- GFN2-xTB band: 10^1 .. 10^3 (hard cliff at 1k) -->
+            <text class="band-label" x="80" y="78">GFN2-xTB · organic / main-group default</text>
+            <rect class="band-r" x="80" y="86" width="320" height="26" rx="2"/>
+
+            <!-- MACE band: solid ~1k..2k (40 GB ceiling), dashed GPU-bound beyond -->
+            <text class="band-label" x="404" y="132">MACE · past the cliff</text>
+            <rect class="band-r sel-band" x="400" y="140" width="48" height="26" rx="2"/>
+            <rect class="band-r tail"     x="448" y="140" width="152" height="26" rx="2"/>
+
+            <!-- marker: 5000 atoms -> x=512 (in the GPU-bound region) -->
+            <line class="marker-line" x1="512" y1="42" x2="512" y2="186"/>
+            <polygon class="marker-cap" points="512,42 506,32 518,32"/>
+            <text class="marker-note" x="512" y="26" text-anchor="middle">5000 atoms → MACE</text>
+
+            <!-- annotations -->
+            <text class="cliff-note" x="396" y="66" text-anchor="end">xTB size cliff · ~1k atoms</text>
+            <text class="ceil-note-svg" x="452" y="182">≈1–2k on a 40 GB GPU · GPU-bound beyond</text>
+
+            <!-- x axis -->
+            <line class="axis-x" x1="80" y1="186" x2="720" y2="186"/>
+            <g class="ticks">
+              <text x="80"  y="206">10¹</text>
+              <text x="240" y="206">10²</text>
+              <text x="400" y="206">10³</text>
+              <text x="560" y="206">10⁴</text>
+              <text x="720" y="206">10⁵</text>
+            </g>
+            <text class="axis-title" x="400" y="232" text-anchor="middle">system size — atoms (log scale)</text>
+          </svg>
+        </div>
+      </figure>
+
+      <table class="spec" aria-describedby="backends-h">
+        <thead>
+          <tr>
+            <th scope="col">Backend</th>
+            <th scope="col">Route when</th>
+            <th scope="col">Ceiling</th>
+            <th scope="col">Skill</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row" data-label="Backend">EMT</th>
+            <td data-label="Route when">quick metallic answers (Al, Cu, Ag, Au, Ni, Pd, Pt + H/C/N/O)</td>
+            <td data-label="Ceiling" class="ceil">wrong physics for organics — no bonds broken</td>
+            <td data-label="Skill">ase-chemist</td>
+          </tr>
+          <tr>
+            <th scope="row" data-label="Backend">Lennard-Jones</th>
+            <td data-label="Route when">toy systems, noble gases, methodology training</td>
+            <td data-label="Ceiling" class="ceil">no real chemistry</td>
+            <td data-label="Skill">ase-chemist</td>
+          </tr>
+          <tr>
+            <th scope="row" data-label="Backend">TIP3P</th>
+            <td data-label="Route when">pure-water MD where rigid O–H bonds matter</td>
+            <td data-label="Ceiling" class="ceil">water only</td>
+            <td data-label="Skill">ase-chemist</td>
+          </tr>
+          <tr>
+            <th scope="row" data-label="Backend">GFN2-xTB <span class="via">via tblite</span></th>
+            <td data-label="Route when">default for organic / main-group</td>
+            <td data-label="Ceiling" class="ceil">impractical past ~1k atoms</td>
+            <td data-label="Skill">ase-chemist</td>
+          </tr>
+          <tr>
+            <th scope="row" data-label="Backend">MACE <span class="via">MP-0 + OFF</span></th>
+            <td data-label="Route when">past the xTB size cliff (~1–2k atoms)</td>
+            <td data-label="Ceiling" class="ceil">~1–2k atoms on a 40 GB GPU; mandatory cross-validation</td>
+            <td data-label="Skill">ase-chemist</td>
+          </tr>
+          <tr>
+            <th scope="row" data-label="Backend">Amber + GAFF2</th>
+            <td data-label="Route when">small-molecule production explicit-solvent MD</td>
+            <td data-label="Ceiling" class="ceil">GAFF2 small molecules only (a carve-out)</td>
+            <td data-label="Skill">ase-chemist</td>
+          </tr>
+          <tr>
+            <th scope="row" data-label="Backend">Gaussian DFT</th>
+            <td data-label="Route when">publication-grade SP / Opt / Freq + thermochem</td>
+            <td data-label="Ceiling" class="ceil">license-gated; no method/basis defaults</td>
+            <td data-label="Skill">ase-chemist</td>
+          </tr>
+          <tr>
+            <th scope="row" data-label="Backend">Amber <span class="via">deep</span></th>
+            <td data-label="Route when">restart/extend, T-REMD, implicit GB, MMPBSA, cpptraj</td>
+            <td data-label="Ceiling" class="ceil">small organics; biopolymers deferred</td>
+            <td data-label="Skill">amber-chemist</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CROSS-VALIDATION: the contract + a schematic of the abort -->
+  <section class="band guard" aria-labelledby="guard-h">
+    <div class="wrap guard-grid">
+      <div class="guard-copy">
+        <h2 id="guard-h" class="section-h">The guardrail that earns MACE its place.</h2>
+        <p class="guard-body">ML potentials produce plausible-but-wrong potential-energy surfaces that users cannot spot. So every MACE MD run validates against GFN2-xTB <strong>every 1&nbsp;ps</strong> and <span class="ceil">aborts if force MAE exceeds 100&nbsp;meV/Å</span>. Opt-out is per-run — never the default. That contract is the whole reason the router is willing to recommend MACE at all.</p>
+        <ul class="guard-facts">
+          <li><span class="gf-k">cadence</span> validate every 1 ps</li>
+          <li><span class="gf-k">threshold</span> abort above 100 meV/Å</li>
+          <li><span class="gf-k">reference</span> GFN2-xTB</li>
+        </ul>
+      </div>
+
+      <figure class="guard-fig" aria-labelledby="guard-cap">
+        <figcaption class="axis-cap" id="guard-cap"><span class="fig-label">FIG 2 · SCHEMATIC</span> How the abort fires. The 100 meV/Å threshold is real; the trace is illustrative, not measured data.</figcaption>
+        <svg viewBox="0 0 460 250" class="guard-svg" role="img" aria-label="Schematic plot of force mean-absolute-error over simulation time. The illustrative trace stays below the real 100 meV per angstrom threshold for most of the run, then crosses it near the end, where the run is aborted.">
+          <g class="g-grid" aria-hidden="true">
+            <line x1="60" y1="40"  x2="430" y2="40"/>
+            <line x1="60" y1="90"  x2="430" y2="90"/>
+            <line x1="60" y1="140" x2="430" y2="140"/>
+            <line x1="60" y1="190" x2="430" y2="190"/>
+          </g>
+          <line class="g-axis" x1="60" y1="40" x2="60" y2="210"/>
+          <line class="g-axis" x1="60" y1="210" x2="430" y2="210"/>
+          <line class="g-threshold" x1="60" y1="90" x2="430" y2="90"/>
+          <text class="g-thlabel" x="64" y="82">abort · MAE_F &gt; 100 meV/Å</text>
+          <polyline class="g-trace ok" points="60,178 92,172 124,180 158,164 192,170 226,150 260,158 294,138 328,150 360,118"/>
+          <polyline class="g-trace bad" points="360,118 384,98 402,72 418,52"/>
+          <circle class="g-abort" cx="402" cy="72" r="5"/>
+          <text class="g-abortlabel" x="394" y="66" text-anchor="end">aborted</text>
+          <text class="g-tick" x="52" y="94" text-anchor="end">100</text>
+          <text class="g-tick" x="52" y="194" text-anchor="end">low</text>
+          <text class="g-ylab" x="20" y="125" transform="rotate(-90 20 125)">force MAE</text>
+          <text class="g-xlab" x="245" y="236" text-anchor="middle">simulation time →</text>
+        </svg>
+      </figure>
+    </div>
+  </section>
+
+  <!-- SKILL PLATES -->
+  <section class="band skills" id="skills" aria-labelledby="skills-h">
+    <div class="wrap">
+      <h2 id="skills-h" class="section-h">Two skills, loaded on demand.</h2>
+      <p class="section-lede">Markdown contracts plus Python scripts. Not a library, not a service — Claude Code loads them based on what you asked for.</p>
+
+      <div class="plates">
+
+        <article class="plate">
+          <header class="plate-head">
+            <span class="plate-name">ase-chemist</span>
+            <span class="plate-kind eyebrow">// atomistic / molecular · ASE</span>
+          </header>
+          <p class="plate-body">Seven backends behind one method-selection router. Geometry optimization, molecular dynamics, single-point observables, trajectory analysis, structure building, and vibrations.</p>
+          <ul class="plate-list">
+            <li><span class="branch">├─</span> optimize — BFGS / FIRE / LBFGS</li>
+            <li><span class="branch">├─</span> MD — NVE / NVT-Langevin / NVT-Nosé–Hoover</li>
+            <li><span class="branch">├─</span> observables — energy, forces, dipole, HOMO–LUMO, Mulliken, Wiberg</li>
+            <li><span class="branch">├─</span> analysis — RMSD / RMSF / RDF / energy drift</li>
+            <li><span class="branch">├─</span> build — molecules, bulk crystals, Pt(111) slabs + adsorbates</li>
+            <li><span class="branch">└─</span> vibrations — Hessian / ZPE</li>
+          </ul>
+          <a class="plate-link" href="https://github.com/scaliaven/chemist/tree/main/ase-chemist">ase-chemist docs →</a>
+        </article>
+
+        <article class="plate">
+          <header class="plate-head">
+            <span class="plate-name">amber-chemist</span>
+            <span class="plate-kind eyebrow">// Amber-native · MD-first</span>
+          </header>
+          <p class="plate-body">Single-replica MD with restart and extend, configurable stages, restraints, barostats, and explicit or implicit GB solvent. T-REMD is a first-class capability.</p>
+          <ul class="plate-list">
+            <li><span class="branch">├─</span> stages — min → heat → density → prod</li>
+            <li><span class="branch">├─</span> solvent — TIP3P / OPC / SPCE / TIP4P-Ew or implicit GB</li>
+            <li><span class="branch">├─</span> barostats — Berendsen / Monte Carlo</li>
+            <li><span class="branch">├─</span> T-REMD — auto ladder, exchange-rate report, demux</li>
+            <li><span class="branch">├─</span> analysis — cpptraj RMSD / RMSF / RDF / hbond / radgyr</li>
+            <li><span class="branch">└─</span> scoring — esander SP, MMPBSA / MMGBSA, alanine scan</li>
+          </ul>
+          <a class="plate-link" href="https://github.com/scaliaven/chemist/tree/main/amber-chemist">amber-chemist docs →</a>
+        </article>
+
+      </div>
+
+      <p class="planned eyebrow">// a third <strong>openmm-chemist</strong> sibling is planned — no timeline.</p>
+    </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section class="band install" id="install" aria-labelledby="install-h">
+    <div class="wrap">
+      <h2 id="install-h" class="section-h">Install.</h2>
+      <p class="section-lede"><code>check_env.py</code> ends with a one-line <span class="data">[SUMMARY]</span> of exactly which workflows your box can run right now. The skill recommends a method that's actually installed — it never asks you to install Gaussian when EMT or LJ would do.</p>
+
+      <div class="code-cols">
+        <div class="code-col">
+          <p class="code-cap eyebrow">// ase-chemist core</p>
+          <pre class="code"><code>conda install -c conda-forge ase tblite-python mdanalysis matplotlib numpy
+python ase-chemist/scripts/check_env.py
+
+# optional: pip install mace-torch        (MACE; CUDA recommended)
+# optional: conda install -c conda-forge ambertools   (GAFF2 carve-out)
+# Gaussian is license-gated (https://gaussian.com/)</code></pre>
+        </div>
+
+        <div class="code-col">
+          <p class="code-cap eyebrow">// amber-chemist core</p>
+          <pre class="code"><code>conda install -c conda-forge ambertools
+python amber-chemist/scripts/check_env.py
+
+# T-REMD needs MPI builds:
+#   pmemd.MPI / pmemd.cuda.MPI</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <span class="brand-mark">[ chemist ]</span>
+    <span class="footer-meta eyebrow">
+      MIT licensed ·
+      <a href="https://github.com/scaliaven/chemist">github.com/scaliaven/chemist</a> ·
+      active development
+    </span>
+  </div>
+</footer>
+
+<script>
+/* Signature interactive: routing-request switcher.
+   Vanilla JS, no deps. ARIA tablist with roving tabindex + full keyboard nav. */
+(function () {
+  var tablist = document.querySelector('#trace [role="tablist"]');
+  if (!tablist) return;
+
+  var tabs = Array.prototype.slice.call(tablist.querySelectorAll('[role="tab"]'));
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function panelFor(tab) {
+    return document.getElementById(tab.getAttribute('aria-controls'));
+  }
+
+  function select(tab, setFocus) {
+    tabs.forEach(function (t) {
+      var selected = (t === tab);
+      t.setAttribute('aria-selected', selected ? 'true' : 'false');
+      t.tabIndex = selected ? 0 : -1;
+      var p = panelFor(t);
+      if (p) {
+        if (selected) {
+          p.hidden = false;
+          if (!reduceMotion) {
+            p.classList.remove('reveal');
+            void p.offsetWidth;            // force reflow to re-trigger the animation
+            p.classList.add('reveal');
+          }
+        } else {
+          p.hidden = true;
+        }
+      }
+    });
+    if (setFocus) tab.focus();
+  }
+
+  tablist.addEventListener('click', function (e) {
+    var tab = e.target.closest('[role="tab"]');
+    if (tab) select(tab, false);
+  });
+
+  tablist.addEventListener('keydown', function (e) {
+    var i = tabs.indexOf(document.activeElement);
+    if (i < 0) return;
+    var next = null;
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':  next = tabs[(i + 1) % tabs.length]; break;
+      case 'ArrowLeft':
+      case 'ArrowUp':    next = tabs[(i - 1 + tabs.length) % tabs.length]; break;
+      case 'Home':       next = tabs[0]; break;
+      case 'End':        next = tabs[tabs.length - 1]; break;
+      default: return;
+    }
+    e.preventDefault();
+    select(next, true);
+  });
+})();
+</script>
+
+</body>
 </html>

@@ -11,7 +11,7 @@
   <sub>
     <a href="ase-chemist/">ase-chemist</a> &nbsp;·&nbsp;
     <a href="amber-chemist/">amber-chemist</a> &nbsp;·&nbsp;
-    <a href="docs/">website</a> &nbsp;·&nbsp;
+    <a href="https://scaliaven.github.io/chemist/">website</a> &nbsp;·&nbsp;
     <a href="run_tests.sh">test harness</a>
   </sub>
 </p>
@@ -198,9 +198,10 @@ Each skill has **three** copies: dev source (edit here), the project copy, and t
 - [`amber-chemist/SKILL.md`](amber-chemist/SKILL.md) — the trigger
   contract and method-selection tree (single-replica MD, T-REMD,
   add-ons, escape hatches).
-- [`amber-chemist/references/`](amber-chemist/references/) — 15
+- [`amber-chemist/references/`](amber-chemist/references/) — 14
   topic-scoped reference files (`md_core`, `remd`, `force_fields`,
-  `analysis`, `scoring`, `failure_modes`, `extension_map`, …).
+  `analysis`, `scoring`, `failure_modes`, `extension_map`, …) plus an
+  index `README.md`.
 
 **Repo-level:**
 

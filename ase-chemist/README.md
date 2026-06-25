@@ -211,7 +211,7 @@ or LJ would already cover the question.
 ase-chemist/
 ├── SKILL.md                  # trigger contract + method-selection tree
 ├── README.md                 # this file
-├── scripts/                  # 12 scripts (one per task; see SKILL.md for the catalog)
+├── scripts/                  # 14 files: 12 task scripts + 2 shared helpers (_calc.py, _gaussian_log.py); see SKILL.md for the catalog
 ├── references/               # 15 scoped reference files; read on demand by topic
 └── evals/                    # 5 prompts for manual review (programmatic assertions: iteration 2)
 ```

@@ -233,7 +233,7 @@ The two trigger-boundary cases that warrant `borderline` tests:
 ## Test harness coverage
 
 Extend `run_tests.sh` with namespace `o*` for OpenMM prompts. Target:
-**6 new prompts**, growing the suite from 31 → 37:
+**6 new prompts**, growing the suite from 43 → 49:
 
 | ID | Type | Tests |
 |---|---|---|
@@ -300,7 +300,7 @@ to `.claude/skills/openmm-chemist/` and `~/.claude/skills/openmm-chemist/`.
 6. **Phase 5** — `omm_custom.py` + `custom_forces.md`. Add
    `o4_custom_force`. One commit.
 7. **Phase 6 — sync.** `rsync` dev source to both loaded copies. Run
-   full 37-prompt `run_tests.sh`. Fix regressions in dev, re-sync,
+   full 49-prompt `run_tests.sh`. Fix regressions in dev, re-sync,
    re-test. Repeat until clean.
 8. **Phase 7 — docs.** `README.md` (user-facing), `failure_modes.md`,
    `extension_map.md`. Update root `README.md` and `CLAUDE.md` to

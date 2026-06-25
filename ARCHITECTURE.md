@@ -129,7 +129,7 @@ Phased, lowest-risk first:
 The skills' contract is *trigger behavior*, so any refactor is verified the same way the
 repo already verifies itself:
 - `python ase-chemist/scripts/check_env.py` still summarizes capabilities.
-- `bash run_tests.sh` — the 14-prompt trigger/no-trigger/borderline harness — must show no
+- `bash run_tests.sh` — the 43-prompt trigger/no-trigger/borderline harness — must show no
   regression in activation or method selection (this is the real safety net for touching
   skills; `PLAN.md` §"Sequencing rules" treats it as the gate).
 - For Phase A specifically: `python -c "import _amber; _amber.render_density(...)"` parity

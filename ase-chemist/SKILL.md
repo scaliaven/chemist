@@ -62,7 +62,7 @@ and you should keep walking.
 | Optimize / minimize / relax | `scripts/optimize.py` | FIRE for far-from-equilibrium, BFGS otherwise |
 | MD at temperature T | `scripts/run_md.py` | Langevin NVT is the default ensemble |
 | Production explicit-solvent MD on a small organic | `scripts/parameterize_gaff2.py` then `scripts/run_amber.py` | GAFF2 + AM1-BCC, TIP3P/OPC water, min/heat/density/prod via pmemd. See `references/amber.md` |
-| **DFT single-point** (energy / forces / dipole / charges at DFT level) | `scripts/gaussian_sp.py` | wraps `ase.calculators.gaussian.Gaussian`; in-house parser for charges/MO. **No method/basis defaults — refuse without `--method`/`--basis`/`--charge`/`--mult`/`--mem`/`--nproc`.** |
+| **DFT single-point** (energy / forces / dipole / charges at DFT level) | `scripts/gaussian_sp.py` | wraps `ase.calculators.gaussian.Gaussian`; in-house parser for charges/MO. **No method/basis defaults — refuse without `--method`/`--basis`/`--charge`/`--multiplicity`/`--mem`/`--nproc`.** |
 | **DFT geometry optimization** | `scripts/gaussian_opt.py` | uses `GaussianOptimizer` (Gaussian L103 — much faster than ASE-BFGS-around-Gaussian-SP). `--convergence tight` for Freq input. |
 | **DFT frequency + thermochemistry** | `scripts/gaussian_freq.py` | Freq job parsed by in-house `_gaussian_log.py` helper (no cclib). Tighten the optimization first. |
 | Vibrations / Hessian / ZPE (xTB-level) | `ase.vibrations.Vibrations` inline | Optimize to fmax ≤ 0.01 first, or you get spurious imaginary modes |
@@ -151,7 +151,7 @@ Apply the first rule that fits the system, in this order:
    TZVP for transition metals; see
    `references/gaussian_method_selection.md`) and
    confirm before running. The scripts also require explicit
-   `--charge`, `--mult`, `--mem`, `--nproc`. Solvent → SMD by
+   `--charge`, `--multiplicity`, `--mem`, `--nproc`. Solvent → SMD by
    default. Thermochem parsing is in-house (`_gaussian_log.py`),
    no cclib dependency.
 

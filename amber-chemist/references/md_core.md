@@ -37,7 +37,7 @@ These verbs do different things; do not confuse them.
 
 **`--restart`** — chain a *different* stage from a previous stage's
 rst7. Sets `irest=1, ntx=5` so velocities are read in. Used for
-heat → density → prod chaining. Output `<prefix>.{mdin,mdout,rst7,nc}`.
+heat → density → prod chaining. Output `<prefix>.{in,mdout,rst7,nc}`.
 
 **`--extend`** — chain another chunk of the *same* stage. Auto-numbers
 the output: if `prod.rst7` and `prod.mdout` (with "Total wall time")

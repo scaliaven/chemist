@@ -10,10 +10,13 @@ construction and accuracy notes.
 
 ## Install
 
-The supported route is **tblite**:
+The supported route is **tblite**. Conda is preferred — the pip wheel is
+libgfortran-fragile on some HPC systems, where `check_env.py` reports
+`[BROKEN] tblite` because the shared library won't load:
 
 ```bash
-pip install tblite
+conda install -c conda-forge tblite-python   # preferred
+pip install tblite                           # fallback (laptops); fragile on HPC
 ```
 
 `xtb-python` (older) is deprecated upstream and we do not use it.
