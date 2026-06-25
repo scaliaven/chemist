@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="chemist: Claude Code skills for computational chemistry method selection, ASE workflows, Amber MD, Gaussian DFT, and ML potential validation.">
+    <title>chemist | Computational Chemistry Skills</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="chemist home">
+        <span class="brand-mark" aria-hidden="true">C</span>
+        <span>chemist</span>
+      </a>
+      <nav aria-label="Primary">
+        <a href="#skills">Skills</a>
+        <a href="#methods">Methods</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/scaliaven/chemist">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Claude Code skills for computational chemistry</p>
+          <h1>Method selection that refuses plausible wrong answers.</h1>
+          <p class="lede">
+            Two sibling skills route simulation requests through ASE, AmberTools,
+            MACE, xTB, and Gaussian with explicit limits, install checks, and
+            validation rules before any calculation starts.
+          </p>
+          <div class="hero-actions" aria-label="Primary links">
+            <a class="button primary" href="https://github.com/scaliaven/chemist">View on GitHub</a>
+            <a class="button" href="#install">Install skills</a>
+          </div>
+        </div>
+        <figure class="hero-visual">
+          <img src="assets/chemist-workflow.png" alt="Workflow visualization connecting molecular geometry, method routing, validation, and simulation outputs.">
+        </figure>
+      </section>
+
+      <section class="section compact" aria-labelledby="why-title">
+        <div class="section-heading">
+          <p class="eyebrow">Why it exists</p>
+          <h2 id="why-title">A router for chemistry judgment, not a black box.</h2>
+        </div>
+        <div class="principles">
+          <article>
+            <h3>Right method for the system</h3>
+            <p>Organic, metallic, protein-like, and large ML-potential cases take different paths, even when the user asks the same plain-language question.</p>
+          </article>
+          <article>
+            <h3>Limits stated up front</h3>
+            <p>xTB size cliffs, Gaussian license gates, Amber scope, and ML potential uncertainty are surfaced as part of the answer.</p>
+          </article>
+          <article>
+            <h3>Validation before confidence</h3>
+            <p>MACE MD is cross-validated against GFN2-xTB every 1 ps by default and aborts when the force error crosses the documented threshold.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="skills" aria-labelledby="skills-title">
+        <div class="section-heading">
+          <p class="eyebrow">Sibling skills</p>
+          <h2 id="skills-title">Two focused surfaces, one design contract.</h2>
+        </div>
+        <div class="skill-grid">
+          <article class="skill-card">
+            <p class="tag">ASE, xTB, MACE, Gaussian</p>
+            <h3>ase-chemist</h3>
+            <p>Atomistic and molecular simulation through ASE with seven backends, explicit Gaussian method inputs, and ML potential validation.</p>
+            <ul>
+              <li>Geometry optimization and molecular dynamics</li>
+              <li>GFN2-xTB, MACE-MP-0, MACE-OFF, EMT, LJ, TIP3P</li>
+              <li>Gaussian single-point, optimization, frequency, and thermochemistry</li>
+            </ul>
+            <a href="https://github.com/scaliaven/chemist/tree/main/ase-chemist">Read ase-chemist docs</a>
+          </article>
+          <article class="skill-card">
+            <p class="tag">AmberTools, pmemd, cpptraj</p>
+            <h3>amber-chemist</h3>
+            <p>Amber-native MD for workflows where restart handling, T-REMD, implicit solvent, cpptraj analysis, and MMPBSA matter.</p>
+            <ul>
+              <li>Single-replica MD with restart and extension</li>
+              <li>Temperature replica-exchange MD with demux support</li>
+              <li>Endpoint scoring, alanine scans, and trajectory analysis</li>
+            </ul>
+            <a href="https://github.com/scaliaven/chemist/tree/main/amber-chemist">Read amber-chemist docs</a>
+          </article>
+        </div>
+      </section>
+
+      <section class="section methods" id="methods" aria-labelledby="methods-title">
+        <div class="section-heading">
+          <p class="eyebrow">Backends</p>
+          <h2 id="methods-title">The route depends on chemistry, scale, and installed tools.</h2>
+        </div>
+        <div class="method-table" role="table" aria-label="Supported computational chemistry backends">
+          <div class="table-row table-head" role="row">
+            <span role="columnheader">Backend</span>
+            <span role="columnheader">Reach for it when</span>
+            <span role="columnheader">Skill</span>
+          </div>
+          <div class="table-row" role="row">
+            <span role="cell">GFN2-xTB</span>
+            <span role="cell">Organic and main-group systems up to the practical xTB size cliff.</span>
+            <span role="cell">ase-chemist</span>
+          </div>
+          <div class="table-row" role="row">
+            <span role="cell">MACE</span>
+            <span role="cell">Larger organic or materials MD, guarded by mandatory xTB cross-validation.</span>
+            <span role="cell">ase-chemist</span>
+          </div>
+          <div class="table-row" role="row">
+            <span role="cell">Gaussian DFT</span>
+            <span role="cell">Publication-grade SP, optimization, frequency, and thermochemistry.</span>
+            <span role="cell">ase-chemist</span>
+          </div>
+          <div class="table-row" role="row">
+            <span role="cell">Amber</span>
+            <span role="cell">Production MD, T-REMD, implicit solvent, cpptraj analysis, and MMPBSA.</span>
+            <span role="cell">amber-chemist</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section split" id="install" aria-labelledby="install-title">
+        <div class="section-heading">
+          <p class="eyebrow">Install</p>
+          <h2 id="install-title">Bring only the chemistry stack you need.</h2>
+        </div>
+        <div class="install-panels">
+          <article>
+            <h3>ase-chemist core</h3>
+            <pre><code>conda install -c conda-forge ase tblite-python mdanalysis matplotlib numpy
+python ase-chemist/scripts/check_env.py</code></pre>
+          </article>
+          <article>
+            <h3>amber-chemist core</h3>
+            <pre><code>conda install -c conda-forge ambertools
+python amber-chemist/scripts/check_env.py</code></pre>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>MIT licensed.</span>
+      <a href="https://github.com/scaliaven/chemist">github.com/scaliaven/chemist</a>
+    </footer>
+  </body>
+</html>
